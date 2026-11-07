@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 CorvusSoftware
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Partial 16-bit address bus for the Game Boy Color.
 //!
 //! This is an untimed memory-routing foundation, NOT the final CPU-visible bus.
