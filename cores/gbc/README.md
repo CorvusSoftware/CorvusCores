@@ -14,6 +14,8 @@ src/
 │   ├── mod.rs          # CPU state and public exports
 │   ├── registers.rs    # SM83 registers and F flag invariants
 │   ├── execute.rs      # Partial base-opcode dispatch and nominal T-cycles
+│   ├── interrupts.rs   # IME, EI/DI/RETI, IRQ service and HALT behavior
+│   ├── interrupt_tests.rs # Delays, IRQ priority and HALT regression tests
 │   ├── load.rs         # Indirect, indexed, and high-memory transfers
 │   ├── load_tests.rs   # Transfer, addressing, and bus-error tests
 │   ├── cb.rs           # All 256 CB-prefixed rotate/shift/bit opcodes
@@ -54,7 +56,8 @@ Components are grouped by responsibility. Future CPU, PPU, audio, DMA, timer, an
 - 32 KiB ROM-only cartridge loading and reading. Unsupported mapper types and sizes are rejected.
 - Partial bus access with explicit unsupported reads/writes, plus manual T-cycle advance for the timer (`Bus::tick_t_cycles`). The CPU does not yet advance peripherals automatically.
 - Timer registers `FF04–FF07`: 16-bit divider, all four TIMA clock selections, falling-edge increments, DIV reset, active TAC source switching, 4-T-cycle delayed TIMA reload and interrupt request. TIMA writes during a pending reload cancel that reload.
-- Interrupt registers IF (`FF0F`) and IE (`FFFF`): software and device requests, five priority levels, vector lookup, mask filtering, and acknowledgement. CPU IME and actual interrupt service are **not** implemented.
+- Interrupt registers IF (`FF0F`) and IE (`FFFF`): software and device requests, five priority levels, vector lookup, mask filtering, and acknowledgement.
+- SM83 interrupt handling: private CPU IME flag, delayed EI, immediate DI and RETI, priority vector service (20 nominal T-cycles), IF acknowledgement, return-address stack writes, HALT sleep/wake, and the pending-interrupt HALT bug. HALT idle steps and interrupt entry do not automatically tick the bus.
 - Partial SM83 CPU interpreter: register pairs and flag masking, all eight 8-bit accumulator ALU families (ADD, ADC, SUB, SBC, AND, XOR, OR, CP), including register, (HL), and immediate forms; JP/JR branches, and nominal instruction T-cycle counts.
 - SM83 transfer module: LD (BC/DE),A and LD A,(BC/DE), auto-increment/decrement LD (HL+/-),A and LD A,(HL+/-), high-memory LDH (a8),A / LDH A,(a8) and LD (C),A / LD A,(C), plus absolute LD (a16),A / LD A,(a16). Transfers preserve flags, use wrapping HL arithmetic, and fail explicitly for unsupported I/O rather than fabricating register behavior.
 - Additional arithmetic/flag instructions: DAA, CPL, SCF, CCF, RLCA/RRCA/RLA/RRA, ADD HL,r16, ADD SP,e8, and LD HL,SP+e8. Unit tests exercise carry/half-carry edge cases and two-digit BCD addition/subtraction.
@@ -69,9 +72,9 @@ Components are grouped by responsibility. Future CPU, PPU, audio, DMA, timer, an
 
 ## Not implemented yet
 
-**No games can execute end to end.** CPU interrupt dispatch (IME/EI/DI/RETI), HALT/STOP, boot behavior, full bus arbitration and cycle-accurate scheduling are not yet implemented. The CGB-specific edge cases for TAC writes and same-cycle timer reload writes still require hardware-reference verification. There is no PPU renderer or timing, APU, joypad, DMA, save states, or MBC1/MBC3/MBC5. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
+**No games can execute end to end.** STOP and CGB speed-switching, boot behavior, fine-grained interrupt bus timing and cycle-accurate scheduling are not yet implemented. The CGB-specific edge cases for TAC writes and same-cycle timer reload writes still require hardware-reference verification. There is no PPU renderer or timing, APU, joypad, DMA, save states, or MBC1/MBC3/MBC5. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
 
-The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts are nominal instruction timings, not an implemented clock/scheduler. The timer advances only when the caller explicitly invokes `Bus::tick_t_cycles`; this must not be confused with cycle-accurate CPU-to-bus synchronization. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
+The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts (including HALT idle steps and interrupt service) are nominal timings, not an implemented clock/scheduler. The timer advances only when the caller explicitly invokes `Bus::tick_t_cycles`; this must not be confused with cycle-accurate CPU-to-bus synchronization. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
 
 ## Development
 
@@ -92,5 +95,6 @@ cargo test -p corvus-gbc
 - [Pan Docs — Timer and Divider Registers](https://gbdev.io/pandocs/Timer_and_Divider_Registers.html)
 - [Pan Docs — Timer Obscure Behaviour](https://gbdev.io/pandocs/Timer_Obscure_Behaviour.html)
 - [Pan Docs — Interrupts](https://gbdev.io/pandocs/Interrupts.html)
+- [Pan Docs — HALT](https://gbdev.io/pandocs/halt.html)
 
 All project-owned source files carry CorvusSoftware copyright and AGPL-3.0-only SPDX notices; CI enforces these headers. No copyrighted game ROMs or proprietary firmware are included.
