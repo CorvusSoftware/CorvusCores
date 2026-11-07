@@ -70,8 +70,9 @@ fn pop_af_masks_low_flag_nibble_from_stack() {
 #[test]
 fn call_and_ret_round_trip_through_little_endian_stack() {
     // LD SP,D000 ; CALL 0008 ; NOP ; NOP ; LD B,2A ; RET
-    let (mut cpu, mut bus) =
-        fixture(&[0x31, 0x00, 0xD0, 0xCD, 0x08, 0x00, 0x00, 0x00, 0x06, 0x2A, 0xC9]);
+    let (mut cpu, mut bus) = fixture(&[
+        0x31, 0x00, 0xD0, 0xCD, 0x08, 0x00, 0x00, 0x00, 0x06, 0x2A, 0xC9,
+    ]);
 
     assert_eq!(cpu.step(&mut bus), Ok(12));
     assert_eq!(cpu.registers.sp, 0xD000);
@@ -92,10 +93,10 @@ fn call_and_ret_round_trip_through_little_endian_stack() {
 #[test]
 fn conditional_call_all_four_conditions_taken_and_not_taken() {
     let cases = [
-        (0xC4, FLAG_ZERO, 0),         // CALL NZ
-        (0xCC, 0, FLAG_ZERO),         // CALL Z
-        (0xD4, FLAG_CARRY, 0),        // CALL NC
-        (0xDC, 0, FLAG_CARRY),        // CALL C
+        (0xC4, FLAG_ZERO, 0),  // CALL NZ
+        (0xCC, 0, FLAG_ZERO),  // CALL Z
+        (0xD4, FLAG_CARRY, 0), // CALL NC
+        (0xDC, 0, FLAG_CARRY), // CALL C
     ];
     for (opcode, false_flags, true_flags) in cases {
         let (mut cpu, mut bus) = fixture(&[opcode, 0x08, 0x00]);
@@ -119,10 +120,10 @@ fn conditional_call_all_four_conditions_taken_and_not_taken() {
 #[test]
 fn conditional_ret_all_four_conditions_taken_and_not_taken() {
     let cases = [
-        (0xC0, FLAG_ZERO, 0),   // RET NZ
-        (0xC8, 0, FLAG_ZERO),   // RET Z
-        (0xD0, FLAG_CARRY, 0),  // RET NC
-        (0xD8, 0, FLAG_CARRY),  // RET C
+        (0xC0, FLAG_ZERO, 0),  // RET NZ
+        (0xC8, 0, FLAG_ZERO),  // RET Z
+        (0xD0, FLAG_CARRY, 0), // RET NC
+        (0xD8, 0, FLAG_CARRY), // RET C
     ];
     for (opcode, false_flags, true_flags) in cases {
         let (mut cpu, mut bus) = fixture(&[opcode]);
