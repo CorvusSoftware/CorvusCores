@@ -26,15 +26,15 @@ impl Cpu {
 
     pub(super) fn pop16(&mut self, bus: &Bus) -> Result<u16, CpuError> {
         let low_address = self.registers.sp;
-        let low = bus
-            .read(low_address)
-            .ok_or(CpuError::UnmappedRead { address: low_address })?;
+        let low = bus.read(low_address).ok_or(CpuError::UnmappedRead {
+            address: low_address,
+        })?;
         self.registers.sp = low_address.wrapping_add(1);
 
         let high_address = self.registers.sp;
-        let high = bus
-            .read(high_address)
-            .ok_or(CpuError::UnmappedRead { address: high_address })?;
+        let high = bus.read(high_address).ok_or(CpuError::UnmappedRead {
+            address: high_address,
+        })?;
         self.registers.sp = high_address.wrapping_add(1);
 
         Ok(u16::from_le_bytes([low, high]))
