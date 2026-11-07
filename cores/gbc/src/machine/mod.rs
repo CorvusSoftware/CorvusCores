@@ -4,8 +4,8 @@
 //! Instruction-boundary orchestration for the incomplete GBC emulator.
 //!
 //! CPU instructions, HALT idle steps and interrupt entry return nominal
-//! CPU T-cycles. This runner advances the timer and simplified LCD PPU by
-//! that count *after* the entire CPU step. It does not interleave memory
+//! CPU T-cycles. This runner advances the timer, OAM DMA and nominal LCD PPU
+//! by that count *after* the entire CPU step. It does not interleave memory
 //! accesses with peripherals and is not a cycle-accurate scheduler or
 //! the CorvusSoftware frontend API.
 
@@ -57,13 +57,13 @@ impl Machine {
         self.elapsed_t_cycles
     }
 
-    /// Execute one CPU step, then advance timers, LCD modes and IRQ requests.
+    /// Execute one CPU step, then advance timers, DMA, LCD modes and IRQs.
     ///
     /// The next step observes any interrupt generated in this step. If
     /// execution fails, no time is advanced or accounted, although existing
     /// CPU and bus operations may already have changed state.
     ///
-    /// This remains *instruction-boundary* timing: writes to timer/LCD
+    /// This remains *instruction-boundary* timing: writes to timer/LCD/DMA
     /// registers take effect before the step's T-cycles are advanced, not
     /// at their real per-M-cycle location.
     pub fn step(&mut self) -> Result<u8, CpuError> {
