@@ -12,7 +12,9 @@ use crate::bus::Bus;
 impl Cpu {
     fn fetch8(&mut self, bus: &Bus) -> Result<u8, CpuError> {
         let address = self.registers.pc;
-        let value = bus.read(address).ok_or(CpuError::UnmappedRead { address })?;
+        let value = bus
+            .read(address)
+            .ok_or(CpuError::UnmappedRead { address })?;
         self.registers.pc = address.wrapping_add(1);
         Ok(value)
     }
@@ -32,7 +34,9 @@ impl Cpu {
             3 => Ok(r.e),
             4 => Ok(r.h),
             5 => Ok(r.l),
-            6 => bus.read(r.hl()).ok_or(CpuError::UnmappedRead { address: r.hl() }),
+            6 => bus
+                .read(r.hl())
+                .ok_or(CpuError::UnmappedRead { address: r.hl() }),
             7 => Ok(r.a),
             _ => unreachable!("8-bit register field is three bits"),
         }
@@ -102,53 +106,86 @@ impl Cpu {
                 let dst = (op >> 3) & 0x07;
                 let value = self.fetch8(bus)?;
                 self.write_r8(dst, value, bus)?;
-                if dst == 6 { 12 } else { 8 }
+                if dst == 6 {
+                    12
+                } else {
+                    8
+                }
             }
             op if op & 0xC7 == 0x04 => {
                 let code = (op >> 3) & 0x07;
                 let value = self.read_r8(code, bus)?;
                 let result = self.increment8(value);
                 self.write_r8(code, result, bus)?;
-                if code == 6 { 12 } else { 4 }
+                if code == 6 {
+                    12
+                } else {
+                    4
+                }
             }
             op if op & 0xC7 == 0x05 => {
                 let code = (op >> 3) & 0x07;
                 let value = self.read_r8(code, bus)?;
                 let result = self.decrement8(value);
                 self.write_r8(code, result, bus)?;
-                if code == 6 { 12 } else { 4 }
+                if code == 6 {
+                    12
+                } else {
+                    4
+                }
             }
             0x40..=0x75 | 0x77..=0x7F => {
                 let src = opcode & 7;
                 let dst = (opcode >> 3) & 7;
                 let value = self.read_r8(src, bus)?;
                 self.write_r8(dst, value, bus)?;
-                if src == 6 || dst == 6 { 8 } else { 4 }
+                if src == 6 || dst == 6 {
+                    8
+                } else {
+                    4
+                }
             }
             0x80..=0x87 => {
                 let source = opcode & 7;
                 let value = self.read_r8(source, bus)?;
                 self.add_a(value);
-                if source == 6 { 8 } else { 4 }
+                if source == 6 {
+                    8
+                } else {
+                    4
+                }
             }
             0x90..=0x97 => {
                 let source = opcode & 7;
                 let value = self.read_r8(source, bus)?;
                 self.sub_a(value, true);
-                if source == 6 { 8 } else { 4 }
+                if source == 6 {
+                    8
+                } else {
+                    4
+                }
             }
             0xA8..=0xAF => {
                 let source = opcode & 7;
                 let value = self.read_r8(source, bus)?;
                 self.registers.a ^= value;
-                self.registers.set_flags(if self.registers.a == 0 { FLAG_ZERO } else { 0 });
-                if source == 6 { 8 } else { 4 }
+                self.registers
+                    .set_flags(if self.registers.a == 0 { FLAG_ZERO } else { 0 });
+                if source == 6 {
+                    8
+                } else {
+                    4
+                }
             }
             0xB8..=0xBF => {
                 let source = opcode & 7;
                 let value = self.read_r8(source, bus)?;
                 self.sub_a(value, false);
-                if source == 6 { 8 } else { 4 }
+                if source == 6 {
+                    8
+                } else {
+                    4
+                }
             }
             0xC6 => {
                 let value = self.fetch8(bus)?;
@@ -163,7 +200,8 @@ impl Cpu {
             0xEE => {
                 let value = self.fetch8(bus)?;
                 self.registers.a ^= value;
-                self.registers.set_flags(if self.registers.a == 0 { FLAG_ZERO } else { 0 });
+                self.registers
+                    .set_flags(if self.registers.a == 0 { FLAG_ZERO } else { 0 });
                 8
             }
             0xFE => {
@@ -173,14 +211,19 @@ impl Cpu {
             }
             0x18 => {
                 let displacement = self.fetch8(bus)? as i8;
-                self.registers.pc = self.registers.pc.wrapping_add(i16::from(displacement) as u16);
+                self.registers.pc = self
+                    .registers
+                    .pc
+                    .wrapping_add(i16::from(displacement) as u16);
                 12
             }
             0x20 | 0x28 | 0x30 | 0x38 => {
                 let displacement = self.fetch8(bus)? as i8;
                 if self.check_condition(opcode) {
-                    self.registers.pc =
-                        self.registers.pc.wrapping_add(i16::from(displacement) as u16);
+                    self.registers.pc = self
+                        .registers
+                        .pc
+                        .wrapping_add(i16::from(displacement) as u16);
                     12
                 } else {
                     8
@@ -209,7 +252,9 @@ impl Cpu {
             }
             0xFA => {
                 let address = self.fetch16(bus)?;
-                self.registers.a = bus.read(address).ok_or(CpuError::UnmappedRead { address })?;
+                self.registers.a = bus
+                    .read(address)
+                    .ok_or(CpuError::UnmappedRead { address })?;
                 16
             }
             _ => {

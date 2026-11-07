@@ -24,13 +24,22 @@ impl fmt::Display for CartridgeError {
                 write!(f, "cartridge type 0x{code:02X} is not supported yet")
             }
             Self::UnsupportedRomSizeCode { code } => {
-                write!(f, "ROM size code 0x{code:02X} is not supported by ROM-only cartridges")
+                write!(
+                    f,
+                    "ROM size code 0x{code:02X} is not supported by ROM-only cartridges"
+                )
             }
             Self::UnsupportedRamSizeCode { code } => {
-                write!(f, "RAM size code 0x{code:02X} is not supported by ROM-only cartridges")
+                write!(
+                    f,
+                    "RAM size code 0x{code:02X} is not supported by ROM-only cartridges"
+                )
             }
             Self::IncorrectRomOnlyLength { actual } => {
-                write!(f, "expected a 32768-byte ROM-only cartridge, got {actual} bytes")
+                write!(
+                    f,
+                    "expected a 32768-byte ROM-only cartridge, got {actual} bytes"
+                )
             }
         }
     }

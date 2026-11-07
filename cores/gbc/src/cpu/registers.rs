@@ -101,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn 16_bit_pairs_round_trip_in_big_endian_register_order() {
+    fn sixteen_bit_pairs_round_trip_in_big_endian_register_order() {
         let mut registers = Registers::default();
         registers.set_bc(0x1234);
         registers.set_de(0x5678);
