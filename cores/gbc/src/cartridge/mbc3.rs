@@ -122,10 +122,7 @@ impl Mbc3Cartridge {
                     + usize::from(address - 0xA000);
                 self.ram.get(index).copied().unwrap_or(0xFF)
             }
-            register @ 0x08..=0x0C => self
-                .rtc
-                .as_ref()
-                .map_or(0xFF, |rtc| rtc.read(register)),
+            register @ 0x08..=0x0C => self.rtc.as_ref().map_or(0xFF, |rtc| rtc.read(register)),
             _ => 0xFF,
         };
         Some(value)
