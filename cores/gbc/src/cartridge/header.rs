@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 CorvusSoftware
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Game Boy / Game Boy Color cartridge header parsing.
 //!
 //! Hardware reference: <https://gbdev.io/pandocs/The_Cartridge_Header.html>
