@@ -36,7 +36,7 @@ src/
 │   └── tests.rs        # Self-authored CPU instruction fixtures
 ├── cartridge/
 │   ├── mod.rs          # Public cartridge/mapper exports
-│   ├── cartridge.rs    # Type-safe ROM-only/MBC1 mapper delegation
+│   ├── mapper.rs       # Type-safe ROM-only/MBC1 mapper delegation
 │   ├── mbc1.rs         # ROM/RAM bank selection and MBC1 control latches
 │   ├── mbc1_tests.rs   # Synthetic ROM/RAM bank regression tests
 │   ├── error.rs        # Cartridge errors and image length validation
