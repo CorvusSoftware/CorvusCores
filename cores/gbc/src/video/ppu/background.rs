@@ -29,14 +29,16 @@ impl Ppu {
             return;
         }
 
-        let map_base = if self.lcdc & 0x08 != 0 { 0x9C00 } else { 0x9800 };
+        let map_base = if self.lcdc & 0x08 != 0 {
+            0x9C00
+        } else {
+            0x9800
+        };
         let y = self.scy.wrapping_add(self.ly);
 
         for screen_x in 0..SCREEN_WIDTH {
             let x = self.scx.wrapping_add(screen_x as u8);
-            let map_address = map_base
-                + u16::from(y / 8) * 32
-                + u16::from(x / 8);
+            let map_address = map_base + u16::from(y / 8) * 32 + u16::from(x / 8);
             let tile = vram
                 .read_bank(map_address, 0)
                 .expect("background map address is valid");
@@ -65,7 +67,9 @@ impl Ppu {
             };
             let address = tile_base + u16::from(tile_y) * 2;
             let low = vram.read_bank(address, tile_bank).expect("valid tile row");
-            let high = vram.read_bank(address + 1, tile_bank).expect("valid tile row");
+            let high = vram
+                .read_bank(address + 1, tile_bank)
+                .expect("valid tile row");
             let bit = 7 - tile_x;
             let color_id = ((low >> bit) & 1) | (((high >> bit) & 1) << 1);
 
