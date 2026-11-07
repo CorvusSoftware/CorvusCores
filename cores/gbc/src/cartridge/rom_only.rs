@@ -52,4 +52,3 @@ impl RomOnlyCartridge {
         Some(self.rom[usize::from(address)])
     }
 }
-
