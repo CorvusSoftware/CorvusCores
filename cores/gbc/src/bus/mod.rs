@@ -3,12 +3,14 @@
 
 //! Partial 16-bit address bus for the Game Boy Color.
 //!
-//! This is an untimed memory-routing foundation, NOT the final CPU-visible bus.
-//! Unimplemented I/O, precisely timed CPU interrupt service, boot ROM
-//! mapping, DMA and PPU access restrictions are deliberately not faked. An absent read returns `None`,
-//! and an unsupported write returns `false`.
+//! A partial CPU-facing memory bus, not a cycle-accurate hardware bus.
+//! VRAM/OAM access gating follows nominal LCD modes, and OAM DMA advances
+//! in T-cycle steps. CPU/DMA source-bus conflicts, true per-access timing,
+//! boot ROM mapping and most I/O are not implemented. Unsupported reads
+//! return `None`, unsupported writes `false`.
 
 use crate::cartridge::{CgbSupport, RomOnlyCartridge};
+use crate::dma::OamDma;
 use crate::interrupts::{Interrupt, InterruptController};
 use crate::memory::{HighRam, WorkRam};
 use crate::timer::Timer;
@@ -33,6 +35,7 @@ pub struct Bus {
     hram: HighRam,
     vram: VideoRam,
     oam: ObjectRam,
+    dma: OamDma,
     ppu: Ppu,
     timer: Timer,
     interrupts: InterruptController,
@@ -52,6 +55,7 @@ impl Bus {
             hram: HighRam::new(),
             vram: VideoRam::new(color),
             oam: ObjectRam::new(),
+            dma: OamDma::new(),
             ppu: Ppu::new(color),
             timer: Timer::new(),
             interrupts: InterruptController::new(),
@@ -68,13 +72,38 @@ impl Bus {
         self.ppu.framebuffer()
     }
 
-    /// Advance timers and the simplified PPU using normal-speed CPU T-cycles.
-    /// Direct Cpu::step calls do not advance these components automatically.
-    /// CGB double-speed conversion is not implemented.
+    /// Advance timer, OAM DMA and PPU using normal-speed CPU T-cycles.
+    /// DMA writes OAM independently of CPU LCD-mode access restrictions.
+    /// Direct Cpu::step calls do not tick peripherals automatically.
+    /// CGB double-speed conversion and mid-instruction CPU bus timing remain
+    /// unsupported even though these components advance per T-cycle.
     pub fn tick_t_cycles(&mut self, cycles: u32) {
-        self.timer.tick(cycles, &mut self.interrupts);
-        self.ppu
-            .tick(cycles, &self.vram, &self.oam, &mut self.interrupts);
+        for _ in 0..cycles {
+            self.timer.tick(1, &mut self.interrupts);
+            if let Some((source, destination)) = self.dma.tick_t_cycle() {
+                let value = self.read_dma_source(source);
+                self.oam.write(destination, value);
+            }
+            self.ppu.tick(1, &self.vram, &self.oam, &mut self.interrupts);
+        }
+    }
+
+    /// True while FF46 has an unfinished OAM transfer.
+    pub fn oam_dma_active(&self) -> bool {
+        self.dma.active()
+    }
+
+    /// Source reads bypass CPU LCD-mode access restrictions.
+    /// Pages outside 00–DF are not currently hardware-accurate: an
+    /// unsupported source gives the deterministic placeholder FF.
+    fn read_dma_source(&self, address: u16) -> u8 {
+        match address {
+            0x0000..=0x7FFF => self.cartridge.read_rom(address).unwrap_or(0xFF),
+            0x8000..=0x9FFF => self.vram.read(address).unwrap_or(0xFF),
+            0xA000..=0xBFFF => 0xFF, // ROM-only cartridge RAM is absent.
+            0xC000..=0xDFFF => self.wram.read(address).unwrap_or(0xFF),
+            _ => 0xFF,
+        }
     }
 
     pub fn request_interrupt(&mut self, interrupt: Interrupt) {
@@ -96,14 +125,27 @@ impl Bus {
     pub fn read(&self, address: u16) -> Option<u8> {
         match address {
             0x0000..=0x7FFF => self.cartridge.read_rom(address),
-            0x8000..=0x9FFF => self.vram.read(address),
+            0x8000..=0x9FFF => {
+                if self.ppu.cpu_can_access_vram() {
+                    self.vram.read(address)
+                } else {
+                    Some(0xFF)
+                }
+            }
             // ROM-only cartridges have no external RAM installed.
             0xA000..=0xBFFF => Some(0xFF),
             0xC000..=0xFDFF => self.wram.read(address),
-            0xFE00..=0xFE9F => self.oam.read(address),
+            0xFE00..=0xFE9F => {
+                if self.ppu.cpu_can_access_oam() && !self.dma.active() {
+                    self.oam.read(address)
+                } else {
+                    Some(0xFF)
+                }
+            }
             0xFF04..=0xFF07 => self.timer.read(address),
             0xFF0F => Some(self.interrupts.read_if()),
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read(address),
+            0xFF46 => Some(self.dma.source_high()),
             0xFF4F => self.vram.read_bank_register(),
             0xFF68..=0xFF6B => self.ppu.read(address),
             0xFF70 => self.wram.read_bank_register(),
@@ -118,9 +160,21 @@ impl Bus {
     pub fn write(&mut self, address: u16, value: u8) -> bool {
         match address {
             0x0000..=0x7FFF | 0xA000..=0xBFFF => true,
-            0x8000..=0x9FFF => self.vram.write(address, value),
+            0x8000..=0x9FFF => {
+                if self.ppu.cpu_can_access_vram() {
+                    self.vram.write(address, value)
+                } else {
+                    true // CPU write ignored, not an unsupported address.
+                }
+            }
             0xC000..=0xFDFF => self.wram.write(address, value),
-            0xFE00..=0xFE9F => self.oam.write(address, value),
+            0xFE00..=0xFE9F => {
+                if self.ppu.cpu_can_access_oam() && !self.dma.active() {
+                    self.oam.write(address, value)
+                } else {
+                    true // CPU write ignored while PPU or DMA owns OAM.
+                }
+            }
             0xFF04..=0xFF07 => self.timer.write(address, value),
             0xFF0F => {
                 self.interrupts.write_if(value);
@@ -128,6 +182,10 @@ impl Bus {
             }
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => {
                 self.ppu.write(address, value, &mut self.interrupts)
+            }
+            0xFF46 => {
+                self.dma.start(value);
+                true
             }
             0xFF4F => self.vram.write_bank_register(value),
             0xFF68..=0xFF6B => self.ppu.write(address, value, &mut self.interrupts),
@@ -228,7 +286,7 @@ mod tests {
     #[test]
     fn unsupported_registers_are_not_silently_fake_mapped() {
         let mut bus = test_bus(0x80);
-        for addr in [0xFEA0, 0xFF00, 0xFF46] {
+        for addr in [0xFEA0, 0xFF00, 0xFF01] {
             assert_eq!(bus.read(addr), None);
             assert!(!bus.write(addr, 0xAA));
         }
