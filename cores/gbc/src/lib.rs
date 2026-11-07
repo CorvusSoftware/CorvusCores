@@ -1,6 +1,9 @@
 //! Game Boy Color core foundations.
 //!
-//! This crate does not yet emulate a console. Hardware and host API integration
-//! will be introduced as they are implemented and verified.
+//! Cartridge parsing and selected memory regions are implemented. CPU/PPU
+//! timing, peripherals, boot and CorvusSoftware API integration are not.
 
+pub mod bus;
 pub mod cartridge;
+mod memory;
+mod video;
