@@ -5,7 +5,7 @@
 
 use super::Ppu;
 use crate::interrupts::InterruptController;
-use crate::video::VideoRam;
+use crate::video::{ObjectRam, VideoRam};
 use crate::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
 fn lcd_write(ppu: &mut Ppu, irq: &mut InterruptController, address: u16, value: u8) {
@@ -13,7 +13,7 @@ fn lcd_write(ppu: &mut Ppu, irq: &mut InterruptController, address: u16, value: 
 }
 
 fn render_line(ppu: &mut Ppu, vram: &VideoRam, irq: &mut InterruptController) {
-    ppu.tick(252, vram, irq);
+    ppu.tick(252, vram, &ObjectRam::new(), irq);
 }
 
 #[test]
@@ -26,9 +26,9 @@ fn dmg_decodes_tile_bitplanes_msb_first_and_maps_bgp_shades() {
     lcd_write(&mut ppu, &mut irq, 0xFF47, 0xE4);
     lcd_write(&mut ppu, &mut irq, 0xFF40, 0x91);
 
-    ppu.tick(251, &vram, &mut irq);
+    ppu.tick(251, &vram, &ObjectRam::new(), &mut irq);
     assert_eq!(ppu.framebuffer()[..8], [0x7FFF; 8]);
-    ppu.tick(1, &vram, &mut irq);
+    ppu.tick(1, &vram, &ObjectRam::new(), &mut irq);
     assert_eq!(
         ppu.framebuffer()[..8],
         [0x7FFF, 0x56B5, 0x294A, 0x0000, 0x7FFF, 0x56B5, 0x294A, 0x0000]
@@ -46,7 +46,7 @@ fn dmg_bgp_can_remap_raw_tile_colors_without_changing_vram() {
     lcd_write(&mut ppu, &mut irq, 0xFF47, 0x0C); // color 1 -> shade 3
     lcd_write(&mut ppu, &mut irq, 0xFF40, 0x91);
 
-    render_line(&mut ppu, &vram, &mut irq);
+    render_line(&mut ppu, &vram, &ObjectRam::new(), &mut irq);
     assert_eq!(ppu.framebuffer()[0], 0x0000);
     assert_eq!(ppu.framebuffer()[7], 0x0000);
     assert_eq!(ppu.framebuffer()[8], 0x7FFF); // next tile is color 0
@@ -68,7 +68,7 @@ fn signed_and_unsigned_tile_data_and_both_background_maps() {
         let mut ppu = Ppu::new(false);
         lcd_write(&mut ppu, &mut irq, 0xFF47, 0xE4);
         lcd_write(&mut ppu, &mut irq, 0xFF40, lcdc);
-        render_line(&mut ppu, &vram, &mut irq);
+        render_line(&mut ppu, &vram, &ObjectRam::new(), &mut irq);
         assert_eq!(ppu.framebuffer()[0], expected, "LCDC={lcdc:02X}");
     }
 }
@@ -91,11 +91,11 @@ fn scrolling_wraps_at_256_pixels_horizontally_and_vertically() {
     lcd_write(&mut ppu, &mut irq, 0xFF47, 0xE4);
     lcd_write(&mut ppu, &mut irq, 0xFF40, 0x91);
 
-    render_line(&mut ppu, &vram, &mut irq);
+    render_line(&mut ppu, &vram, &ObjectRam::new(), &mut irq);
     assert_eq!(ppu.framebuffer()[0], 0x56B5);
     assert_eq!(ppu.framebuffer()[8], 0x294A);
 
-    ppu.tick(8 * 456, &vram, &mut irq); // visible line 8, scroll Y wraps
+    ppu.tick(8 * 456, &vram, &ObjectRam::new(), &mut irq); // visible line 8, scroll Y wraps
     let start = 8 * SCREEN_WIDTH;
     assert_eq!(ppu.framebuffer()[start], 0x294A);
     assert_eq!(ppu.framebuffer()[start + 8], 0x56B5);
@@ -111,20 +111,20 @@ fn framebuffer_is_updated_at_mode_three_end_and_blank_on_lcd_disable() {
     }
     lcd_write(&mut ppu, &mut irq, 0xFF47, 0xE4);
     lcd_write(&mut ppu, &mut irq, 0xFF40, 0x91);
-    ppu.tick(252, &vram, &mut irq);
+    ppu.tick(252, &vram, &ObjectRam::new(), &mut irq);
     assert_eq!(ppu.framebuffer()[0], 0x56B5);
 
     for row in 0..8 {
         assert!(vram.write(0x8000 + row * 2, 0));
         assert!(vram.write(0x8001 + row * 2, 0xFF)); // color 2
     }
-    ppu.tick(456, &vram, &mut irq);
+    ppu.tick(456, &vram, &ObjectRam::new(), &mut irq);
     assert_eq!(ppu.framebuffer()[0], 0x56B5); // completed line is immutable
     assert_eq!(ppu.framebuffer()[SCREEN_WIDTH], 0x294A);
 
     lcd_write(&mut ppu, &mut irq, 0xFF40, 0);
     assert!(ppu.framebuffer().iter().all(|&pixel| pixel == 0x7FFF));
-    ppu.tick(456, &vram, &mut irq);
+    ppu.tick(456, &vram, &ObjectRam::new(), &mut irq);
     assert!(ppu.framebuffer().iter().all(|&pixel| pixel == 0x7FFF));
 }
 
@@ -144,8 +144,8 @@ fn dmg_bit_zero_blanks_background_but_cgb_still_draws_it() {
     lcd_write(&mut cgb, &mut irq, 0xFF69, 0x00);
     lcd_write(&mut cgb, &mut irq, 0xFF40, 0x90);
 
-    render_line(&mut dmg, &dmg_vram, &mut irq);
-    render_line(&mut cgb, &cgb_vram, &mut irq);
+    render_line(&mut dmg, &dmg_vram, &ObjectRam::new(), &mut irq);
+    render_line(&mut cgb, &cgb_vram, &ObjectRam::new(), &mut irq);
     assert_eq!(dmg.framebuffer()[0], 0x7FFF);
     assert_eq!(cgb.framebuffer()[0], 0x001F);
 }
@@ -167,7 +167,7 @@ fn cgb_attributes_select_vram_bank_palette_and_horizontal_vertical_flip() {
     lcd_write(&mut ppu, &mut irq, 0xFF69, 0x1F); // pure red RGB555
     lcd_write(&mut ppu, &mut irq, 0xFF69, 0x00);
     lcd_write(&mut ppu, &mut irq, 0xFF40, 0x91);
-    render_line(&mut ppu, &vram, &mut irq);
+    render_line(&mut ppu, &vram, &ObjectRam::new(), &mut irq);
 
     assert_eq!(ppu.framebuffer()[0], 0x001F);
     assert_eq!(ppu.framebuffer()[1], 0x7FFF);
@@ -201,12 +201,12 @@ fn cgb_bgpd_is_blocked_in_mode_three_but_index_still_increments() {
     lcd_write(&mut ppu, &mut irq, 0xFF69, 0x25);
     lcd_write(&mut ppu, &mut irq, 0xFF68, 0x82);
     lcd_write(&mut ppu, &mut irq, 0xFF40, 0x91);
-    ppu.tick(80, &vram, &mut irq); // mode 3
+    ppu.tick(80, &vram, &ObjectRam::new(), &mut irq); // mode 3
 
     assert_eq!(ppu.read(0xFF69), Some(0xFF));
     lcd_write(&mut ppu, &mut irq, 0xFF69, 0xA7); // ignored write
     assert_eq!(ppu.read(0xFF68), Some(0x83)); // still incremented
-    ppu.tick(172, &vram, &mut irq); // HBlank
+    ppu.tick(172, &vram, &ObjectRam::new(), &mut irq); // HBlank
     lcd_write(&mut ppu, &mut irq, 0xFF68, 2);
     assert_eq!(ppu.read(0xFF69), Some(0x25));
 }
