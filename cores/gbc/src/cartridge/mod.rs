@@ -7,6 +7,8 @@ mod cartridge;
 mod error;
 mod header;
 mod mbc1;
+#[cfg(test)]
+mod mbc1_tests;
 mod rom_only;
 
 #[cfg(test)]
