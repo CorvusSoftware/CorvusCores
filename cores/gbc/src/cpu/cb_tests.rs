@@ -24,11 +24,7 @@ fn all_256_cb_opcodes_are_decoded_with_correct_nominal_cycles() {
             8
         };
 
-        assert_eq!(
-            cpu.step(&mut bus),
-            Ok(expected_cycles),
-            "CB {opcode:02X}"
-        );
+        assert_eq!(cpu.step(&mut bus), Ok(expected_cycles), "CB {opcode:02X}");
         assert_eq!(cpu.registers.pc, 2, "CB {opcode:02X}");
     }
 }
@@ -37,23 +33,24 @@ fn all_256_cb_opcodes_are_decoded_with_correct_nominal_cycles() {
 fn rotates_shifts_and_swap_update_carry_zero_and_result() {
     // (CB opcode on B, input, incoming carry, result, expected flags)
     let examples = [
-        (0x00, 0x80, false, 0x01, FLAG_CARRY), // RLC B
-        (0x08, 0x01, false, 0x80, FLAG_CARRY), // RRC B
-        (0x10, 0x80, true, 0x01, FLAG_CARRY),  // RL B
-        (0x18, 0x01, true, 0x80, FLAG_CARRY),  // RR B
-        (0x20, 0x81, false, 0x02, FLAG_CARRY), // SLA B
-        (0x28, 0x81, false, 0xC0, FLAG_CARRY), // SRA B
-        (0x30, 0xF0, true, 0x0F, 0),          // SWAP B
+        (0x00, 0x80, false, 0x01, FLAG_CARRY),             // RLC B
+        (0x08, 0x01, false, 0x80, FLAG_CARRY),             // RRC B
+        (0x10, 0x80, true, 0x01, FLAG_CARRY),              // RL B
+        (0x18, 0x01, true, 0x80, FLAG_CARRY),              // RR B
+        (0x20, 0x81, false, 0x02, FLAG_CARRY),             // SLA B
+        (0x28, 0x81, false, 0xC0, FLAG_CARRY),             // SRA B
+        (0x30, 0xF0, true, 0x0F, 0),                       // SWAP B
         (0x38, 0x01, false, 0x00, FLAG_ZERO | FLAG_CARRY), // SRL B
-        (0x00, 0x00, true, 0x00, FLAG_ZERO),  // RLC zero
-        (0x10, 0x00, true, 0x01, 0),          // RL through carry
-        (0x18, 0x00, true, 0x80, 0),          // RR through carry
+        (0x00, 0x00, true, 0x00, FLAG_ZERO),               // RLC zero
+        (0x10, 0x00, true, 0x01, 0),                       // RL through carry
+        (0x18, 0x00, true, 0x80, 0),                       // RR through carry
     ];
 
     for (opcode, input, old_carry, result, flags) in examples {
         let (mut cpu, mut bus) = fixture(&[0xCB, opcode]);
         cpu.registers.b = input;
-        cpu.registers.set_flags(if old_carry { FLAG_CARRY } else { 0 });
+        cpu.registers
+            .set_flags(if old_carry { FLAG_CARRY } else { 0 });
         assert_eq!(cpu.step(&mut bus), Ok(8), "CB {opcode:02X}");
         assert_eq!(cpu.registers.b, result, "CB {opcode:02X}");
         assert_eq!(cpu.registers.flags(), flags, "CB {opcode:02X}");
@@ -66,7 +63,8 @@ fn bit_tests_all_positions_without_writing_or_destroying_carry() {
         let opcode = 0x40 | (bit << 3); // BIT bit,B
         let (mut cpu, mut bus) = fixture(&[0xCB, opcode]);
         cpu.registers.b = 1 << bit;
-        cpu.registers.set_flags(FLAG_SUBTRACT | FLAG_CARRY | FLAG_ZERO);
+        cpu.registers
+            .set_flags(FLAG_SUBTRACT | FLAG_CARRY | FLAG_ZERO);
 
         assert_eq!(cpu.step(&mut bus), Ok(8));
         assert_eq!(cpu.registers.b, 1 << bit);
@@ -75,7 +73,10 @@ fn bit_tests_all_positions_without_writing_or_destroying_carry() {
         cpu.registers.pc = 0;
         cpu.registers.b = 0;
         assert_eq!(cpu.step(&mut bus), Ok(8));
-        assert_eq!(cpu.registers.flags(), FLAG_ZERO | FLAG_HALF_CARRY | FLAG_CARRY);
+        assert_eq!(
+            cpu.registers.flags(),
+            FLAG_ZERO | FLAG_HALF_CARRY | FLAG_CARRY
+        );
     }
 }
 
