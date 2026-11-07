@@ -3,9 +3,7 @@
 
 //! CPU unit tests use self-authored machine-code byte streams, not game ROMs.
 
-use super::{
-    Cpu, CpuError, Registers, FLAG_CARRY, FLAG_HALF_CARRY, FLAG_SUBTRACT, FLAG_ZERO,
-};
+use super::{Cpu, CpuError, Registers, FLAG_CARRY, FLAG_HALF_CARRY, FLAG_SUBTRACT, FLAG_ZERO};
 use crate::bus::Bus;
 use crate::cartridge::RomOnlyCartridge;
 
