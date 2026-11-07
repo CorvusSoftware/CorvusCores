@@ -293,7 +293,10 @@ fn ppu_requests_vblank_once_at_line_144_during_cpu_halt() {
 fn machine_exposes_rgb555_background_pixels_after_cpu_halt_steps() {
     // The fixture runs in native CGB mode (header flag 0x80).
     let mut machine = fixture(&[0x76]); // HALT
-    assert_eq!(machine.bus().framebuffer().len(), crate::SCREEN_WIDTH * crate::SCREEN_HEIGHT);
+    assert_eq!(
+        machine.bus().framebuffer().len(),
+        crate::SCREEN_WIDTH * crate::SCREEN_HEIGHT
+    );
 
     assert!(machine.bus_mut().write(0x8000, 0xFF)); // tile 0 row 0, color 1
     assert!(machine.bus_mut().write(0xFF68, 0x82)); // palette 0, color 1
