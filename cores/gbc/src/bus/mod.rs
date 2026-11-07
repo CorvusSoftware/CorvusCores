@@ -8,7 +8,7 @@
 //! LCD-mode gating, DMA source paths and DMG/CGB modes stay distinct.
 //! CPU/DMA bus conflicts, per-access timing and most I/O remain unmodeled.
 
-use crate::cartridge::{CgbSupport, RomOnlyCartridge};
+use crate::cartridge::{Cartridge, CgbSupport};
 use crate::dma::{OamDma, VramDma};
 use crate::interrupts::{Interrupt, InterruptController};
 use crate::memory::{HighRam, WorkRam};
@@ -36,7 +36,7 @@ pub enum HardwareMode {
 }
 
 pub struct Bus {
-    cartridge: RomOnlyCartridge,
+    cartridge: Cartridge,
     mode: HardwareMode,
     wram: WorkRam,
     hram: HighRam,
@@ -50,7 +50,8 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new(cartridge: RomOnlyCartridge) -> Self {
+    pub fn new(cartridge: impl Into<Cartridge>) -> Self {
+        let cartridge = cartridge.into();
         let mode = match cartridge.header().cgb_support {
             CgbSupport::DmgOnly => HardwareMode::DmgCompatibility,
             CgbSupport::Enhanced | CgbSupport::Exclusive => HardwareMode::Cgb,
