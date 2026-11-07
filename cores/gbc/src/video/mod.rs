@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! Video-owned VRAM, OAM and the nominal PPU background renderer.
+//! Video-owned VRAM, OAM and the nominal BG/window/OBJ scanline renderer.
 //!
 //! CPU VRAM/OAM access restrictions during PPU modes and DMA are not modeled.
 
