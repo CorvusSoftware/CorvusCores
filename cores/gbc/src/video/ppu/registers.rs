@@ -5,8 +5,8 @@
 //!
 //! DMA ($FF46) and CGB object palettes ($FF6A/$FF6B) remain unmapped.
 
-use super::{Mode, Ppu};
 use super::background::WHITE;
+use super::{Mode, Ppu};
 use crate::interrupts::InterruptController;
 
 impl Ppu {
