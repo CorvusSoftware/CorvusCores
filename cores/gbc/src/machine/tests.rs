@@ -415,12 +415,7 @@ fn gdma_stalls_cpu_fetches_for_32_t_cycles_then_resumes() {
 fn cpu_ldh_ff55_starts_gdma_before_instruction_boundary_tick() {
     // LD A,00 ; LDH (55),A ; NOP
     let mut machine = fixture(&[0x3E, 0x00, 0xE0, 0x55, 0x00]);
-    for (register, value) in [
-        (0xFF51, 0xC0),
-        (0xFF52, 0),
-        (0xFF53, 0),
-        (0xFF54, 0),
-    ] {
+    for (register, value) in [(0xFF51, 0xC0), (0xFF52, 0), (0xFF53, 0), (0xFF54, 0)] {
         assert!(machine.bus_mut().write(register, value));
     }
     assert!(machine.bus_mut().write(0xC000, 0xC7));
