@@ -6,6 +6,7 @@
 //! No boot ROM sequence, interrupts, HALT, STOP, or timing of bus peripherals.
 //! Only instructions implemented in `execute` may be stepped.
 
+mod alu;
 mod error;
 mod execute;
 mod registers;
