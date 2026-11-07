@@ -4,13 +4,18 @@
 //! Partial 16-bit address bus for the Game Boy Color.
 //!
 //! This is an untimed memory-routing foundation, NOT the final CPU-visible bus.
-//! Unimplemented I/O, interrupts, boot ROM mapping, DMA and PPU access
-//! restrictions are deliberately not faked. An absent read returns `None`,
+//! Unimplemented I/O, CPU interrupt dispatch, boot ROM mapping, DMA and PPU
+//! access restrictions are deliberately not faked. An absent read returns `None`,
 //! and an unsupported write returns `false`.
 
 use crate::cartridge::{CgbSupport, RomOnlyCartridge};
+use crate::interrupts::{Interrupt, InterruptController};
 use crate::memory::{HighRam, WorkRam};
+use crate::timer::Timer;
 use crate::video::{ObjectRam, VideoRam};
+
+#[cfg(test)]
+mod timing_tests;
 
 /// Mode selected from the cartridge's header at this early stage.
 ///
@@ -28,6 +33,8 @@ pub struct Bus {
     hram: HighRam,
     vram: VideoRam,
     oam: ObjectRam,
+    timer: Timer,
+    interrupts: InterruptController,
 }
 
 impl Bus {
@@ -44,11 +51,32 @@ impl Bus {
             hram: HighRam::new(),
             vram: VideoRam::new(color),
             oam: ObjectRam::new(),
+            timer: Timer::new(),
+            interrupts: InterruptController::new(),
         }
     }
 
     pub fn mode(&self) -> HardwareMode {
         self.mode
+    }
+
+    /// Advance the divider and timers by CPU T-cycles. The current Cpu::step
+    /// returns nominal cycles but does not call this method automatically.
+    pub fn tick_t_cycles(&mut self, cycles: u32) {
+        self.timer.tick(cycles, &mut self.interrupts);
+    }
+
+    pub fn request_interrupt(&mut self, interrupt: Interrupt) {
+        self.interrupts.request(interrupt);
+    }
+
+    pub fn highest_pending_interrupt(&self) -> Option<Interrupt> {
+        self.interrupts.highest_pending()
+    }
+
+    /// Acknowledge only; CPU IME/stack/vector dispatch is not implemented.
+    pub fn acknowledge_interrupt(&mut self, interrupt: Interrupt) {
+        self.interrupts.acknowledge(interrupt);
     }
 
     /// Read an implemented address. `None` means not yet modeled, not
@@ -61,9 +89,12 @@ impl Bus {
             0xA000..=0xBFFF => Some(0xFF),
             0xC000..=0xFDFF => self.wram.read(address),
             0xFE00..=0xFE9F => self.oam.read(address),
+            0xFF04..=0xFF07 => self.timer.read(address),
+            0xFF0F => Some(self.interrupts.read_if()),
             0xFF4F => self.vram.read_bank_register(),
             0xFF70 => self.wram.read_bank_register(),
             0xFF80..=0xFFFE => self.hram.read(address),
+            0xFFFF => Some(self.interrupts.read_ie()),
             _ => None,
         }
     }
@@ -76,9 +107,18 @@ impl Bus {
             0x8000..=0x9FFF => self.vram.write(address, value),
             0xC000..=0xFDFF => self.wram.write(address, value),
             0xFE00..=0xFE9F => self.oam.write(address, value),
+            0xFF04..=0xFF07 => self.timer.write(address, value),
+            0xFF0F => {
+                self.interrupts.write_if(value);
+                true
+            }
             0xFF4F => self.vram.write_bank_register(value),
             0xFF70 => self.wram.write_bank_register(value),
             0xFF80..=0xFFFE => self.hram.write(address, value),
+            0xFFFF => {
+                self.interrupts.write_ie(value);
+                true
+            }
             _ => false,
         }
     }
@@ -170,7 +210,7 @@ mod tests {
     #[test]
     fn unsupported_registers_are_not_silently_fake_mapped() {
         let mut bus = test_bus(0x80);
-        for addr in [0xFEA0, 0xFF00, 0xFF0F, 0xFF46, 0xFFFF] {
+        for addr in [0xFEA0, 0xFF00, 0xFF46] {
             assert_eq!(bus.read(addr), None);
             assert!(!bus.write(addr, 0xAA));
         }
