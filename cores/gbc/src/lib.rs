@@ -3,10 +3,10 @@
 
 //! Game Boy Color core foundations.
 //!
-//! Cartridge parsing, memory, partial SM83 execution, timers and
-//! interrupts have initial implementations. The machine runner advances the
-//! timer at instruction boundaries, not at individual bus accesses.
-//! PPU timing, boot and CorvusSoftware API integration are not implemented.
+//! Cartridge parsing, memory, partial SM83 execution, timers, interrupts
+//! and nominal LCD mode timing have initial implementations. The machine
+//! runner clocks peripherals at instruction boundaries, not per bus access.
+//! Pixel rendering, boot and CorvusSoftware API integration are absent.
 
 pub mod bus;
 pub mod cartridge;
