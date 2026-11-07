@@ -18,6 +18,8 @@ use palette::BgPalette;
 use crate::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
 #[cfg(test)]
+mod render_tests;
+#[cfg(test)]
 mod tests;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
