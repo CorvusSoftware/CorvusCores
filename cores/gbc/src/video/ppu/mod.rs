@@ -93,8 +93,13 @@ impl Ppu {
         }
     }
 
-    fn lcd_enabled(&self) -> bool {
+    pub(crate) fn lcd_enabled(&self) -> bool {
         self.lcdc & 0x80 != 0
+    }
+
+    /// HDMA is triggered only upon entering visible-line HBlank.
+    pub(crate) fn visible_hblank(&self) -> bool {
+        self.lcd_enabled() && self.ly < 144 && self.mode == Mode::HBlank
     }
 
     /// CPU VRAM reads/writes are blocked only during pixel transfer (mode 3).

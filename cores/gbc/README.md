@@ -9,7 +9,8 @@ src/
 ├── lib.rs              # Crate modules
 ├── bus/
 │   ├── mod.rs          # CPU video access gating, DMA and memory routing
-│   ├── dma_tests.rs    # DMA transfers and LCD-mode CPU access tests
+│   ├── dma_tests.rs    # OAM DMA transfers and LCD-mode CPU access tests
+│   ├── vram_dma_tests.rs # GDMA/HDMA bus and HBlank tests
 │   └── timing_tests.rs # Timer/interrupt bus integration tests
 ├── cpu/
 │   ├── mod.rs          # CPU state and public exports
@@ -35,7 +36,9 @@ src/
 │   └── tests.rs        # Synthetic cartridge tests
 ├── dma/
 │   ├── mod.rs          # OAM DMA transfer clock and source page latch
-│   └── tests.rs        # DMA cadence, restart and address-pair tests
+│   ├── tests.rs        # OAM DMA cadence and restart tests
+│   ├── vram.rs         # CGB GDMA/HDMA source, destination and block engine
+│   └── vram_tests.rs   # CGB VRAM DMA register/timing tests
 ├── memory/
 │   ├── mod.rs
 │   ├── wram.rs         # Work RAM banking and echo region
@@ -74,7 +77,7 @@ Components are grouped by responsibility. Future audio and input components shou
 - Cartridge header parsing: CGB compatibility, cartridge type and RAM/ROM size fields, header checksum.
 - 32 KiB ROM-only cartridge loading and reading. Unsupported mapper types and sizes are rejected.
 - Partial bus access with explicit unsupported reads/writes and manual T-cycle advance through `Bus::tick_t_cycles`. Standalone `Cpu::step` deliberately does not tick peripherals. CPU VRAM reads return FF and writes are ignored in LCD mode 3; CPU OAM access is blocked in modes 2/3 and while OAM DMA is active, without blocking internal PPU/DMA memory accesses.
-- An instruction-boundary `Machine` runner owns a CPU and bus, advances the timer, OAM DMA and nominal LCD mode clock by each successful CPU step's T-cycles, and counts elapsed cycles. It clocks HALT idle steps and interrupt entry too. A timer or LCD interrupt generated during one step is observed on the next. This is **not** per-M-cycle/per-memory-access synchronization.
+- An instruction-boundary `Machine` runner owns a CPU and bus, advances the timer, OAM DMA, CGB VRAM DMA and nominal LCD mode clock by each successful step's T-cycles, and counts elapsed cycles. During active GDMA and HDMA blocks it stalls CPU execution in four-T-cycle quanta without fetching an opcode. It clocks HALT idle steps and interrupt entry too. A timer or LCD interrupt generated during one step is observed on the next. This is **not** per-M-cycle/per-memory-access synchronization.
 - Timer registers `FF04–FF07`: 16-bit divider, all four TIMA clock selections, falling-edge increments, DIV reset, active TAC source switching, 4-T-cycle delayed TIMA reload and interrupt request. TIMA writes during a pending reload cancel that reload.
 - Interrupt registers IF (`FF0F`) and IE (`FFFF`): software and device requests, five priority levels, vector lookup, mask filtering, and acknowledgement.
 - SM83 interrupt handling: private CPU IME flag, delayed EI, immediate DI and RETI, priority vector service (20 nominal T-cycles), IF acknowledgement, return-address stack writes, HALT sleep/wake, and the pending-interrupt HALT bug. HALT idle steps and interrupt entry do not automatically tick the bus.
@@ -92,6 +95,7 @@ Components are grouped by responsibility. Future audio and input components shou
 - Native CGB BG/OBJ palette RAM via BGPI/BGPD (`FF68/FF69`) and OBPI/OBPD (`FF6A/FF6B`): separate 64-byte arrays, auto-increment and wrap, and blocked palette data access during mode 3 (writes still increment their index). The 15-bit colors are exported directly as RGB555 without LCD color correction.
 - First PPU milestone: LCDC/STAT, LY/LYC and scroll/window/DMG palette register storage (FF40–FF45 and FF47–FF4B); nominal mode 2/3/0 progression across 456-dot visible scanlines, VBlank on LY=144–153, VBlank IRQ on line 144 and edge-triggered shared STAT IRQ. LCD disable resets and freezes the line clock.
 - **FF46 OAM DMA:** copy 160 bytes from a source page to FE00–FE9F over 640 normal-speed T-cycles (one byte per four T-cycles). Supports ROM, VRAM, ROM-only absent cartridge RAM, and WRAM as source; a fresh FF46 write restarts the transfer. Readback returns the latched page; `Bus::oam_dma_active()` exposes ongoing status. Unsupported source pages E0–FF currently yield a deterministic FF placeholder rather than actual bus-dependent values.
+- **CGB VRAM DMA FF51–FF55:** masked 16-byte-aligned source and VRAM destination addresses; source ROM/WRAM (ROM-only absent SRAM yields FF), destination uses current VRAM bank `VBK`; FF51–FF54 are write-only, FF55 reports remaining blocks or FF when complete. GDMA transfers 16–2048 bytes continuously and stalls CPU; HDMA transfers one 16-byte block at the start of each visible HBlank, pausing CPU for 32 normal-speed T-cycles and skipping VBlank. Clearing FF55 bit 7 stops an active HDMA with remaining-block status. Starting HDMA with LCD off uses GDMA; switching LCD off converts pending HDMA to continuous transfer. Bus queries: `vram_dma_active()` and `vram_dma_cpu_stalled()`.
 - **Simplified LCD timings:** mode 2 lasts 80 dots, mode 3 always 172 dots, and mode 0 uses the remaining 204 dots. The entire BG/window/OBJ scanline is sampled when mode 3 ends (dot 252), rather than pixel by pixel. Real mode 3 varies with scrolling, window and sprite fetch stalls; the LY=153 early rollover, LCD startup, mid-line register writes, actual mode-2 OAM scanning, *per-access timing* of VRAM/OAM CPU blocking and CGB double-speed conversion remain unimplemented.
 - HRAM at `FF80–FFFE` and OAM storage at `FE00–FE9F`.
 - Basic differences between color mode and original Game Boy compatibility mode for the implemented bank selection.
@@ -99,9 +103,9 @@ Components are grouped by responsibility. Future audio and input components shou
 
 ## Not implemented yet
 
-**No games can execute end to end.** STOP and CGB speed-switching, boot behavior, fine-grained interrupt/bus timing and cycle-accurate scheduling are not yet implemented. The CGB-specific edge cases for TAC writes and same-cycle timer reload writes still require hardware-reference verification. The PPU renders BG/window/OBJ scanlines but is **not a cycle-accurate pixel fetcher** and has no frontend display. APU, joypad, **CGB VRAM DMA (HDMA/GDMA)**, save states, and MBC1/MBC3/MBC5 are absent. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
+**No games can execute end to end.** STOP and CGB speed-switching, boot behavior, fine-grained interrupt/bus timing and cycle-accurate scheduling are not yet implemented. The CGB-specific edge cases for TAC writes and same-cycle timer reload writes still require hardware-reference verification. The PPU renders BG/window/OBJ scanlines but is **not a cycle-accurate pixel fetcher** and has no frontend display. APU, joypad, save states, and MBC1/MBC3/MBC5 are absent. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
 
-The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts (including HALT idle steps and interrupt service) are nominal timings. `Machine::step` automatically advances the timer and nominal LCD dot clock **after each successful instruction/CPU step**; direct `Cpu::step` calls do not tick the bus. Timer and LCD register writes inside an instruction therefore take effect before its entire nominal cycle count is advanced, which is not real hardware timing. The framebuffer is composited line by line at the end of nominal mode 3 and reset to white on LCD disable. OAM DMA copies use a fixed four-T-cycle cadence, but exact startup delay, CPU/DMA bus conflicts (different on DMG/CGB), mid-instruction access ordering, collisions with the pixel fetcher, and CGB double-speed behavior are **not** simulated. FF46 is handled without a complete DMA blocking model for CPU ROM/WRAM accesses. Its initial white pixels, CGB palette RAM initialization, and DMG grayscale shades are deterministic test/display choices, not claimed as real post-boot LCD colors. No complete scheduler or cycle-accurate CPU-to-bus synchronization exists. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
+The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts (including HALT idle steps and interrupt service) are nominal timings. `Machine::step` automatically advances the timer and nominal LCD dot clock **after each successful instruction/CPU step**; direct `Cpu::step` calls do not tick the bus. Timer and LCD register writes inside an instruction therefore take effect before its entire nominal cycle count is advanced, which is not real hardware timing. The framebuffer is composited line by line at the end of nominal mode 3 and reset to white on LCD disable. OAM DMA copies use a fixed four-T-cycle cadence, but exact startup delay, CPU/DMA bus conflicts (different on DMG/CGB), mid-instruction access ordering, collisions with the pixel fetcher, and CGB double-speed behavior are **not** simulated. FF46 is handled without a complete DMA blocking model for CPU ROM/WRAM accesses. VRAM GDMA/HDMA use one byte per two normal-speed T-cycles and pause opcode execution, but use instruction-level entry points, not exact bus arbitration. Unsupported VRAM-DMA source regions (including VRAM itself) currently read deterministic FF; real bus conflict values, GDMA during active pixel transfer, HDMA while CPU is HALTed, HDMA register writes during an active transfer, LCD transitions mid-block and CGB double-speed behavior still require hardware-level validation. Its initial white pixels, CGB palette RAM initialization, and DMG grayscale shades are deterministic test/display choices, not claimed as real post-boot LCD colors. No complete scheduler or cycle-accurate CPU-to-bus synchronization exists. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
 
 ## Development
 
@@ -130,6 +134,7 @@ cargo test -p corvus-gbc
 - [Pan Docs — Object Attribute Memory](https://gbdev.io/pandocs/OAM.html)
 - [Pan Docs — LCD Control](https://gbdev.io/pandocs/LCDC.html)
 - [Pan Docs — OAM DMA Transfer](https://gbdev.io/pandocs/OAM_DMA_Transfer.html)
+- [Pan Docs — CGB VRAM DMA](https://gbdev.io/pandocs/CGB_Registers.html#lcd-vram-dma-transfers)
 - [Pan Docs — Accessing VRAM and OAM](https://gbdev.io/pandocs/Accessing_VRAM_and_OAM.html)
 - [Pan Docs — Tile Data](https://gbdev.io/pandocs/Tile_Data.html)
 - [Pan Docs — Palettes](https://gbdev.io/pandocs/Palettes.html)
