@@ -29,9 +29,11 @@ impl RtcRegisters {
             0x09 => self.minutes,
             0x0A => self.hours,
             0x0B => self.days as u8,
-            0x0C => u8::from(self.days & 0x100 != 0)
-                | if self.halted { 0x40 } else { 0 }
-                | if self.carry { 0x80 } else { 0 },
+            0x0C => {
+                u8::from(self.days & 0x100 != 0)
+                    | if self.halted { 0x40 } else { 0 }
+                    | if self.carry { 0x80 } else { 0 }
+            }
             _ => 0xFF,
         }
     }
