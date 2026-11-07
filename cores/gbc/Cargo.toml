@@ -1,0 +1,10 @@
+[package]
+name = "corvus-gbc"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Game Boy Color emulation core foundations for CorvusCores"
+publish = false
+
+[dependencies]
