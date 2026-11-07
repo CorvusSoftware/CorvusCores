@@ -77,10 +77,18 @@ impl Ppu {
                     pixel_x as u8
                 };
                 let row = (pixel_y % 8) as u16;
-                let bank = if self.cgb_mode { (sprite.attributes >> 3) & 1 } else { 0 };
+                let bank = if self.cgb_mode {
+                    (sprite.attributes >> 3) & 1
+                } else {
+                    0
+                };
                 let tile_address = 0x8000 + u16::from(tile) * 16 + row * 2;
-                let low = vram.read_bank(tile_address, bank).expect("OBJ tile low byte");
-                let high = vram.read_bank(tile_address + 1, bank).expect("OBJ tile high byte");
+                let low = vram
+                    .read_bank(tile_address, bank)
+                    .expect("OBJ tile low byte");
+                let high = vram
+                    .read_bank(tile_address + 1, bank)
+                    .expect("OBJ tile high byte");
                 let bit = 7 - x;
                 let color_id = ((low >> bit) & 1) | (((high >> bit) & 1) << 1);
                 if color_id == 0 {
