@@ -3,7 +3,9 @@
 
 //! Video-owned VRAM, OAM and the nominal BG/window/OBJ scanline renderer.
 //!
-//! CPU VRAM/OAM access restrictions during PPU modes and DMA are not modeled.
+//! The bus gates CPU video-memory accesses according to nominal LCD modes;
+//! DMA uses independent OAM writes. Fine-grained corruption and fetch timing
+//! remain unimplemented.
 
 mod oam;
 mod ppu;

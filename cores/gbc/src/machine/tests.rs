@@ -352,3 +352,30 @@ fn machine_composites_window_and_objects_into_rgb555_framebuffer() {
     assert_eq!(machine.bus().framebuffer()[16], 0x7FFF); // blank next tile
     assert_eq!(machine.bus().read(0xFF6A), Some(0x86));
 }
+
+#[test]
+fn machine_cpu_ff46_write_starts_dma_and_halt_clocks_it_to_completion() {
+    // LD A,C0 ; LDH (46),A ; HALT
+    let mut machine = fixture(&[0x3E, 0xC0, 0xE0, 0x46, 0x76]);
+    for index in 0_u16..160 {
+        assert!(machine.bus_mut().write(0xC000 + index, index as u8));
+    }
+
+    assert_eq!(machine.step(), Ok(8));
+    assert!(!machine.bus().oam_dma_active());
+    assert_eq!(machine.step(), Ok(12)); // writes FF46 before the 12-cycle tick
+    assert!(machine.bus().oam_dma_active());
+    assert_eq!(machine.bus().read(0xFF46), Some(0xC0));
+    assert_eq!(machine.bus().read(0xFE00), Some(0xFF)); // DMA owns OAM
+
+    // The first HALT instruction and subsequent idle steps clock the DMA.
+    for _ in 0..157 {
+        assert_eq!(machine.step(), Ok(4));
+    }
+    assert!(machine.cpu().is_halted());
+    assert!(!machine.bus().oam_dma_active());
+    assert_eq!(machine.bus().read(0xFE00), Some(0));
+    assert_eq!(machine.bus().read(0xFE01), Some(1));
+    assert_eq!(machine.bus().read(0xFE9F), Some(159));
+    assert_eq!(machine.elapsed_t_cycles(), 648);
+}

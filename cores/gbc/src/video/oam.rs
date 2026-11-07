@@ -3,7 +3,9 @@
 
 //! Object attribute memory (FE00–FE9F).
 //!
-//! PPU mode restrictions, OAM DMA, and corruption behavior are not yet handled.
+//! The bus enforces CPU LCD-mode access restrictions. DMA writes use this
+//! storage directly, independently of CPU OAM accessibility. OAM corruption
+//! hardware quirks and mode-2 sprite scanning are not yet implemented.
 
 pub(crate) struct ObjectRam {
     bytes: [u8; 0xA0],
