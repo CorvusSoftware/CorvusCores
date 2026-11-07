@@ -5,10 +5,34 @@ name: Rust
 
 on:
   push:
+    branches: [main]
+    paths:
+      - ".github/workflows/rust.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "cores/**"
+      - "crates/**"
+      - "scripts/**"
   pull_request:
+    paths:
+      - ".github/workflows/rust.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "cores/**"
+      - "crates/**"
+      - "scripts/**"
+
+# A newer push supersedes an older run for the same branch or pull request.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   gbc:
+    name: Format, lint and test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
