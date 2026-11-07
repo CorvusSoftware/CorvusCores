@@ -80,6 +80,16 @@ fn rejects_an_inconsistent_rom_size_code() {
 }
 
 #[test]
+fn rejects_ram_declared_on_rom_only_cartridge() {
+    let mut rom = test_rom(0x80, 0, 0);
+    rom[0x0149] = 0x02;
+    assert!(matches!(
+        RomOnlyCartridge::new(rom),
+        Err(CartridgeError::UnsupportedRamSizeCode { code: 0x02 })
+    ));
+}
+
+#[test]
 fn rejects_an_incorrect_rom_only_length() {
     let mut rom = test_rom(0x80, 0, 0);
     rom.push(0);
