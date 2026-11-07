@@ -22,7 +22,11 @@ use crate::{SCREEN_HEIGHT, SCREEN_WIDTH};
 #[cfg(test)]
 mod render_tests;
 #[cfg(test)]
+mod sprite_tests;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod window_tests;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u8)]
