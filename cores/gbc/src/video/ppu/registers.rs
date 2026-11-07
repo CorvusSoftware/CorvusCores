@@ -29,7 +29,8 @@ impl Ppu {
             0xFF4B => Some(self.wx),
             0xFF68 if self.cgb_mode => Some(self.bg_palette.read_index()),
             0xFF69 if self.cgb_mode => Some(
-                self.bg_palette.read_data(self.lcd_enabled() && self.mode == Mode::Transfer),
+                self.bg_palette
+                    .read_data(self.lcd_enabled() && self.mode == Mode::Transfer),
             ),
             _ => None,
         }
