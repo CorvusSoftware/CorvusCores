@@ -7,6 +7,7 @@ pub enum CartridgeError {
     HeaderTooShort { actual: usize },
     UnsupportedCartridgeType { code: u8 },
     UnsupportedRomSizeCode { code: u8 },
+    UnsupportedRamSizeCode { code: u8 },
     IncorrectRomOnlyLength { actual: usize },
 }
 
@@ -21,6 +22,9 @@ impl fmt::Display for CartridgeError {
             }
             Self::UnsupportedRomSizeCode { code } => {
                 write!(f, "ROM size code 0x{code:02X} is not supported by ROM-only cartridges")
+            }
+            Self::UnsupportedRamSizeCode { code } => {
+                write!(f, "RAM size code 0x{code:02X} is not supported by ROM-only cartridges")
             }
             Self::IncorrectRomOnlyLength { actual } => {
                 write!(f, "expected a 32768-byte ROM-only cartridge, got {actual} bytes")
