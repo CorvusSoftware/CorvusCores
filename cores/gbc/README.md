@@ -8,7 +8,8 @@ This directory contains the independently developed **Game Boy Color core** for 
 src/
 ├── lib.rs              # Crate modules
 ├── bus/
-│   └── mod.rs          # Partial 16-bit address routing
+│   ├── mod.rs          # Partial 16-bit address routing and manual clocking
+│   └── timing_tests.rs # Timer/interrupt bus integration tests
 ├── cpu/
 │   ├── mod.rs          # CPU state and public exports
 │   ├── registers.rs    # SM83 registers and F flag invariants
@@ -33,6 +34,12 @@ src/
 │   ├── mod.rs
 │   ├── wram.rs         # Work RAM banking and echo region
 │   └── hram.rs         # High RAM
+├── interrupts/
+│   ├── mod.rs          # IF/IE, request flags, priority and vectors
+│   └── tests.rs        # Register and priority regression tests
+├── timer/
+│   ├── mod.rs          # DIV/TIMA/TMA/TAC and explicit T-cycle clock
+│   └── tests.rs        # Clock sources and overflow timing tests
 └── video/
     ├── mod.rs
     ├── vram.rs         # VRAM banks, VBK register
@@ -45,7 +52,9 @@ Components are grouped by responsibility. Future CPU, PPU, audio, DMA, timer, an
 
 - Cartridge header parsing: CGB compatibility, cartridge type and RAM/ROM size fields, header checksum.
 - 32 KiB ROM-only cartridge loading and reading. Unsupported mapper types and sizes are rejected.
-- Partial and **untimed** bus access with explicit unsupported reads/writes.
+- Partial bus access with explicit unsupported reads/writes, plus manual T-cycle advance for the timer (`Bus::tick_t_cycles`). The CPU does not yet advance peripherals automatically.
+- Timer registers `FF04–FF07`: 16-bit divider, all four TIMA clock selections, falling-edge increments, DIV reset, active TAC source switching, 4-T-cycle delayed TIMA reload and interrupt request. TIMA writes during a pending reload cancel that reload.
+- Interrupt registers IF (`FF0F`) and IE (`FFFF`): software and device requests, five priority levels, vector lookup, mask filtering, and acknowledgement. CPU IME and actual interrupt service are **not** implemented.
 - Partial SM83 CPU interpreter: register pairs and flag masking, all eight 8-bit accumulator ALU families (ADD, ADC, SUB, SBC, AND, XOR, OR, CP), including register, (HL), and immediate forms; JP/JR branches, and nominal instruction T-cycle counts.
 - SM83 transfer module: LD (BC/DE),A and LD A,(BC/DE), auto-increment/decrement LD (HL+/-),A and LD A,(HL+/-), high-memory LDH (a8),A / LDH A,(a8) and LD (C),A / LD A,(C), plus absolute LD (a16),A / LD A,(a16). Transfers preserve flags, use wrapping HL arithmetic, and fail explicitly for unsupported I/O rather than fabricating register behavior.
 - Additional arithmetic/flag instructions: DAA, CPL, SCF, CCF, RLCA/RRCA/RLA/RRA, ADD HL,r16, ADD SP,e8, and LD HL,SP+e8. Unit tests exercise carry/half-carry edge cases and two-digit BCD addition/subtraction.
@@ -60,9 +69,9 @@ Components are grouped by responsibility. Future CPU, PPU, audio, DMA, timer, an
 
 ## Not implemented yet
 
-**No games can execute end to end.** The remaining unprefixed SM83 work includes HALT/STOP, RETI, interrupt and power-state handling, and boot behavior. I/O peripherals, memory arbitration and timing are not yet modeled. There is no PPU renderer or timing, APU, timers, interrupt controller, joypad, DMA, save states, or MBC1/MBC3/MBC5. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
+**No games can execute end to end.** CPU interrupt dispatch (IME/EI/DI/RETI), HALT/STOP, boot behavior, full bus arbitration and cycle-accurate scheduling are not yet implemented. The CGB-specific edge cases for TAC writes and same-cycle timer reload writes still require hardware-reference verification. There is no PPU renderer or timing, APU, joypad, DMA, save states, or MBC1/MBC3/MBC5. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
 
-The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts are nominal instruction timings, not an implemented clock/scheduler. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
+The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts are nominal instruction timings, not an implemented clock/scheduler. The timer advances only when the caller explicitly invokes `Bus::tick_t_cycles`; this must not be confused with cycle-accurate CPU-to-bus synchronization. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
 
 ## Development
 
@@ -80,5 +89,8 @@ cargo test -p corvus-gbc
 - [Pan Docs — CGB Registers](https://gbdev.io/pandocs/CGB_Registers.html)
 - [Pan Docs — The Cartridge Header](https://gbdev.io/pandocs/The_Cartridge_Header.html)
 - [Pan Docs — CPU Instruction Set](https://gbdev.io/pandocs/CPU_Instruction_Set.html)
+- [Pan Docs — Timer and Divider Registers](https://gbdev.io/pandocs/Timer_and_Divider_Registers.html)
+- [Pan Docs — Timer Obscure Behaviour](https://gbdev.io/pandocs/Timer_Obscure_Behaviour.html)
+- [Pan Docs — Interrupts](https://gbdev.io/pandocs/Interrupts.html)
 
 All project-owned source files carry CorvusSoftware copyright and AGPL-3.0-only SPDX notices; CI enforces these headers. No copyrighted game ROMs or proprietary firmware are included.
