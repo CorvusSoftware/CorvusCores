@@ -42,6 +42,7 @@ fn dmg_bgp_can_remap_raw_tile_colors_without_changing_vram() {
     let mut vram = VideoRam::new(false);
     let mut irq = InterruptController::new();
     assert!(vram.write(0x8000, 0xFF)); // raw color 1 across the row
+    assert!(vram.write(0x9801, 1)); // next map cell is blank tile 1
     lcd_write(&mut ppu, &mut irq, 0xFF47, 0x0C); // color 1 -> shade 3
     lcd_write(&mut ppu, &mut irq, 0xFF40, 0x91);
 
