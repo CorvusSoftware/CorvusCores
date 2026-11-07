@@ -12,6 +12,7 @@ pub enum CartridgeError {
     UnsupportedRomSizeCode { code: u8 },
     UnsupportedRamSizeCode { code: u8 },
     IncorrectRomOnlyLength { actual: usize },
+    IncorrectRomLength { expected: usize, actual: usize },
 }
 
 impl fmt::Display for CartridgeError {
@@ -40,6 +41,9 @@ impl fmt::Display for CartridgeError {
                     f,
                     "expected a 32768-byte ROM-only cartridge, got {actual} bytes"
                 )
+            }
+            Self::IncorrectRomLength { expected, actual } => {
+                write!(f, "expected {expected} ROM bytes, got {actual} bytes")
             }
         }
     }
