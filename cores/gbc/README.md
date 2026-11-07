@@ -36,6 +36,9 @@ src/
 │   ├── mod.rs
 │   ├── wram.rs         # Work RAM banking and echo region
 │   └── hram.rs         # High RAM
+├── machine/
+│   ├── mod.rs          # Instruction-boundary CPU/timer clocking
+│   └── tests.rs        # HALT, timer and interrupt integration tests
 ├── interrupts/
 │   ├── mod.rs          # IF/IE, request flags, priority and vectors
 │   └── tests.rs        # Register and priority regression tests
@@ -54,7 +57,8 @@ Components are grouped by responsibility. Future CPU, PPU, audio, DMA, timer, an
 
 - Cartridge header parsing: CGB compatibility, cartridge type and RAM/ROM size fields, header checksum.
 - 32 KiB ROM-only cartridge loading and reading. Unsupported mapper types and sizes are rejected.
-- Partial bus access with explicit unsupported reads/writes, plus manual T-cycle advance for the timer (`Bus::tick_t_cycles`). The CPU does not yet advance peripherals automatically.
+- Partial bus access with explicit unsupported reads/writes and manual T-cycle advance through `Bus::tick_t_cycles`. Standalone `Cpu::step` deliberately does not tick peripherals.
+- An instruction-boundary `Machine` runner owns a CPU and bus, advances the timer once by each successful CPU step's nominal T-cycles, and counts elapsed T-cycles. It clocks HALT idle steps and interrupt entry too. A timer request generated during one step is observed on the next. This is **not** per-M-cycle/per-memory-access synchronization.
 - Timer registers `FF04–FF07`: 16-bit divider, all four TIMA clock selections, falling-edge increments, DIV reset, active TAC source switching, 4-T-cycle delayed TIMA reload and interrupt request. TIMA writes during a pending reload cancel that reload.
 - Interrupt registers IF (`FF0F`) and IE (`FFFF`): software and device requests, five priority levels, vector lookup, mask filtering, and acknowledgement.
 - SM83 interrupt handling: private CPU IME flag, delayed EI, immediate DI and RETI, priority vector service (20 nominal T-cycles), IF acknowledgement, return-address stack writes, HALT sleep/wake, and the pending-interrupt HALT bug. HALT idle steps and interrupt entry do not automatically tick the bus.
@@ -74,7 +78,7 @@ Components are grouped by responsibility. Future CPU, PPU, audio, DMA, timer, an
 
 **No games can execute end to end.** STOP and CGB speed-switching, boot behavior, fine-grained interrupt bus timing and cycle-accurate scheduling are not yet implemented. The CGB-specific edge cases for TAC writes and same-cycle timer reload writes still require hardware-reference verification. There is no PPU renderer or timing, APU, joypad, DMA, save states, or MBC1/MBC3/MBC5. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
 
-The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts (including HALT idle steps and interrupt service) are nominal timings, not an implemented clock/scheduler. The timer advances only when the caller explicitly invokes `Bus::tick_t_cycles`; this must not be confused with cycle-accurate CPU-to-bus synchronization. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
+The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts (including HALT idle steps and interrupt service) are nominal timings. `Machine::step` automatically advances the timer **after each successful instruction/CPU step**; direct `Cpu::step` calls do not tick the bus. Timer register writes inside an instruction therefore take effect before its entire nominal cycle count is advanced, which is not real hardware timing. No complete scheduler or cycle-accurate CPU-to-bus synchronization exists. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
 
 ## Development
 
