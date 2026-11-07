@@ -379,3 +379,100 @@ fn machine_cpu_ff46_write_starts_dma_and_halt_clocks_it_to_completion() {
     assert_eq!(machine.bus().read(0xFE9F), Some(159));
     assert_eq!(machine.elapsed_t_cycles(), 648);
 }
+
+#[test]
+fn gdma_stalls_cpu_fetches_for_32_t_cycles_then_resumes() {
+    let mut machine = fixture(&[0x00, 0x00]); // NOPs
+    for i in 0_u16..16 {
+        assert!(machine.bus_mut().write(0xC000 + i, (0x80 + i) as u8));
+    }
+    for (register, value) in [
+        (0xFF51, 0xC0),
+        (0xFF52, 0),
+        (0xFF53, 0),
+        (0xFF54, 0),
+        (0xFF55, 0),
+    ] {
+        assert!(machine.bus_mut().write(register, value));
+    }
+    assert!(machine.bus().vram_dma_cpu_stalled());
+
+    for _ in 0..8 {
+        assert_eq!(machine.step(), Ok(4));
+        assert_eq!(machine.cpu().registers.pc, 0);
+    }
+    assert_eq!(machine.elapsed_t_cycles(), 32);
+    assert_eq!(machine.bus().read(0xFF55), Some(0xFF));
+    assert_eq!(machine.bus().read(0x8000), Some(0x80));
+    assert_eq!(machine.bus().read(0x800F), Some(0x8F));
+
+    assert_eq!(machine.step(), Ok(4)); // now fetch NOP
+    assert_eq!(machine.cpu().registers.pc, 1);
+    assert_eq!(machine.elapsed_t_cycles(), 36);
+}
+
+#[test]
+fn cpu_ldh_ff55_starts_gdma_before_instruction_boundary_tick() {
+    // LD A,00 ; LDH (55),A ; NOP
+    let mut machine = fixture(&[0x3E, 0x00, 0xE0, 0x55, 0x00]);
+    for (register, value) in [
+        (0xFF51, 0xC0),
+        (0xFF52, 0),
+        (0xFF53, 0),
+        (0xFF54, 0),
+    ] {
+        assert!(machine.bus_mut().write(register, value));
+    }
+    assert!(machine.bus_mut().write(0xC000, 0xC7));
+    assert_eq!(machine.step(), Ok(8));
+    assert_eq!(machine.step(), Ok(12)); // DMA starts, first 6 bytes transferred
+    assert_eq!(machine.cpu().registers.pc, 4);
+    assert_eq!(machine.bus().read(0x8000), Some(0xC7));
+    assert!(machine.bus().vram_dma_cpu_stalled());
+
+    for _ in 0..5 {
+        assert_eq!(machine.step(), Ok(4));
+        assert_eq!(machine.cpu().registers.pc, 4);
+    }
+    assert_eq!(machine.bus().read(0xFF55), Some(0xFF));
+    assert_eq!(machine.elapsed_t_cycles(), 40);
+    assert_eq!(machine.step(), Ok(4)); // NOP executes after GDMA completion
+    assert_eq!(machine.cpu().registers.pc, 5);
+}
+
+#[test]
+fn visible_hblank_dma_suspends_cpu_for_only_one_block() {
+    let mut machine = fixture(&[0x18, 0xFE]); // JR -2, nominal 12 T-cycles
+    assert!(machine.bus_mut().write(0xC000, 0x7B));
+    assert!(machine.bus_mut().write(0xFF40, 0x80));
+    for (register, value) in [
+        (0xFF51, 0xC0),
+        (0xFF52, 0),
+        (0xFF53, 0),
+        (0xFF54, 0),
+        (0xFF55, 0x81), // 2 blocks, HDMA
+    ] {
+        assert!(machine.bus_mut().write(register, value));
+    }
+
+    for _ in 0..21 {
+        assert_eq!(machine.step(), Ok(12));
+        assert_eq!(machine.cpu().registers.pc, 0);
+    }
+    assert_eq!(machine.elapsed_t_cycles(), 252);
+    assert!(machine.bus().vram_dma_cpu_stalled());
+    assert_eq!(machine.bus().read(0xFF55), Some(1));
+
+    for _ in 0..8 {
+        assert_eq!(machine.step(), Ok(4));
+        assert_eq!(machine.cpu().registers.pc, 0);
+    }
+    assert!(!machine.bus().vram_dma_cpu_stalled());
+    assert!(machine.bus().vram_dma_active()); // second block pending
+    assert_eq!(machine.bus().read(0xFF55), Some(0));
+    assert_eq!(machine.bus().read(0x8000), Some(0x7B));
+    assert_eq!(machine.elapsed_t_cycles(), 284);
+
+    assert_eq!(machine.step(), Ok(12)); // CPU resumes between HBlanks
+    assert_eq!(machine.cpu().registers.pc, 0);
+}
