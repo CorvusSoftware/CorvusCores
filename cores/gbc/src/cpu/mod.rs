@@ -7,6 +7,9 @@
 //! Only instructions implemented in `execute` may be stepped.
 
 mod alu;
+
+#[cfg(test)]
+mod alu_tests;
 mod cb;
 mod error;
 mod execute;
