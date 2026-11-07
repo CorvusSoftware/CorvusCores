@@ -15,6 +15,8 @@ src/
 │   ├── execute.rs      # Partial base-opcode dispatch and nominal T-cycles
 │   ├── cb.rs           # All 256 CB-prefixed rotate/shift/bit opcodes
 │   ├── cb_tests.rs     # CB behavior and timing regression tests
+│   ├── stack.rs        # Stack operations and register-pair transfers
+│   ├── stack_tests.rs  # PUSH/POP/CALL/RET/RST regression tests
 │   ├── alu.rs          # Arithmetic and flag calculations
 │   ├── error.rs        # Unsupported opcodes and unmapped bus errors
 │   └── tests.rs        # Self-authored CPU instruction fixtures
@@ -42,6 +44,7 @@ Components are grouped by responsibility. Future CPU, PPU, audio, DMA, timer, an
 - 32 KiB ROM-only cartridge loading and reading. Unsupported mapper types and sizes are rejected.
 - Partial and **untimed** bus access with explicit unsupported reads/writes.
 - Partial SM83 CPU interpreter: register pairs and flag masking, supported LD/INC/DEC/ADD/SUB/XOR/CP variants, JP/JR branches, direct memory transfers and nominal instruction T-cycle counts.
+- SM83 stack and control flow: PUSH/POP (including AF masking), CALL/RET (conditional and unconditional), RST vectors, JP HL, LD SP,HL and LD (a16),SP. Stack accesses use the current partial bus and report unmapped-address errors.
 - The complete 256-entry **CB-prefixed** SM83 instruction space: RLC, RRC, RL, RR, SLA, SRA, SWAP, SRL, BIT, RES and SET, for registers and `(HL)` where applicable. BIT preserves carry and does not write its operand; `(HL)` variants have distinct nominal timings.
 - Explicit CPU errors for unsupported opcodes and unmapped hardware, rather than silently returning success.
 - 8 banks of WRAM in CGB mode, including `FF70` (SVBK), fixed bank 0, switchable banks 1–7, and the `E000–FDFF` echo.
@@ -52,9 +55,9 @@ Components are grouped by responsibility. Future CPU, PPU, audio, DMA, timer, an
 
 ## Not implemented yet
 
-**No games can execute end to end.** The unprefixed SM83 opcode set is incomplete: HALT/STOP, interrupts, boot sequence, and numerous other operations are absent. There is no PPU renderer or timing, APU, timers, interrupt controller, joypad, DMA, save states, or MBC1/MBC3/MBC5. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
+**No games can execute end to end.** The unprefixed SM83 opcode set is still incomplete: HALT/STOP, RETI, interrupts, boot sequence, and numerous arithmetic, memory-access and flag-control operations are absent. There is no PPU renderer or timing, APU, timers, interrupt controller, joypad, DMA, save states, or MBC1/MBC3/MBC5. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
 
-The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts are nominal instruction timings, not an implemented clock/scheduler. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
+The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts are nominal instruction timings, not an implemented clock/scheduler. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
 
 ## Development
 
