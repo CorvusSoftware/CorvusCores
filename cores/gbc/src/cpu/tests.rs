@@ -7,7 +7,7 @@ use super::{Cpu, CpuError, Registers, FLAG_CARRY, FLAG_HALF_CARRY, FLAG_SUBTRACT
 use crate::bus::Bus;
 use crate::cartridge::RomOnlyCartridge;
 
-fn fixture(code: &[u8]) -> (Cpu, Bus) {
+pub(super) fn fixture(code: &[u8]) -> (Cpu, Bus) {
     assert!(code.len() < 0x0143);
     let mut rom = vec![0_u8; 0x8000];
     rom[..code.len()].copy_from_slice(code);
