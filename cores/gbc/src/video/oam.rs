@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 CorvusSoftware
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Object attribute memory (FE00–FE9F).
 //!
 //! PPU mode restrictions, OAM DMA, and corruption behavior are not yet handled.
