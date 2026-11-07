@@ -4,13 +4,13 @@
 //! Partial 16-bit address bus for the Game Boy Color.
 //!
 //! A partial CPU-facing memory bus, not a cycle-accurate hardware bus.
-//! VRAM/OAM access gating follows nominal LCD modes, and OAM DMA advances
-//! in T-cycle steps. CPU/DMA source-bus conflicts, true per-access timing,
+//! VRAM/OAM gating follows nominal LCD modes, and both DMA controllers
+//! advance in T-cycle steps. CPU/DMA source-bus conflicts, true per-access timing,
 //! boot ROM mapping and most I/O are not implemented. Unsupported reads
 //! return `None`, unsupported writes `false`.
 
 use crate::cartridge::{CgbSupport, RomOnlyCartridge};
-use crate::dma::OamDma;
+use crate::dma::{OamDma, VramDma};
 use crate::interrupts::{Interrupt, InterruptController};
 use crate::memory::{HighRam, WorkRam};
 use crate::timer::Timer;
@@ -38,6 +38,7 @@ pub struct Bus {
     vram: VideoRam,
     oam: ObjectRam,
     dma: OamDma,
+    vram_dma: VramDma,
     ppu: Ppu,
     timer: Timer,
     interrupts: InterruptController,
@@ -58,6 +59,7 @@ impl Bus {
             vram: VideoRam::new(color),
             oam: ObjectRam::new(),
             dma: OamDma::new(),
+            vram_dma: VramDma::new(),
             ppu: Ppu::new(color),
             timer: Timer::new(),
             interrupts: InterruptController::new(),
@@ -74,11 +76,9 @@ impl Bus {
         self.ppu.framebuffer()
     }
 
-    /// Advance timer, OAM DMA and PPU using normal-speed CPU T-cycles.
-    /// DMA writes OAM independently of CPU LCD-mode access restrictions.
-    /// Direct Cpu::step calls do not tick peripherals automatically.
-    /// CGB double-speed conversion and mid-instruction CPU bus timing remain
-    /// unsupported even though these components advance per T-cycle.
+    /// Advance timer, OAM DMA, CGB VRAM DMA and PPU in normal-speed T-cycles.
+    /// CPU executes at instruction boundaries rather than at individual bus
+    /// accesses, and CGB double-speed clock conversion is not modeled.
     pub fn tick_t_cycles(&mut self, cycles: u32) {
         for _ in 0..cycles {
             self.timer.tick(1, &mut self.interrupts);
@@ -86,14 +86,46 @@ impl Bus {
                 let value = self.read_dma_source(source);
                 self.oam.write(destination, value);
             }
+            if let Some((source, destination)) = self.vram_dma.tick_t_cycle() {
+                let value = self.read_vram_dma_source(source);
+                // The LCD engine and VRAM DMA have independent access paths.
+                // Bank selection follows VBK at the moment of the transfer.
+                self.vram.write(destination, value);
+            }
+            let was_hblank = self.ppu.visible_hblank();
             self.ppu
                 .tick(1, &self.vram, &self.oam, &mut self.interrupts);
+            if !was_hblank && self.ppu.visible_hblank() {
+                self.vram_dma.begin_hblank();
+            }
         }
+    }
+
+    /// True if GDMA or an active HBlank block currently holds the CPU.
+    pub fn vram_dma_cpu_stalled(&self) -> bool {
+        self.vram_dma.stalls_cpu()
+    }
+
+    /// True for ongoing GDMA or a HDMA waiting for the next visible HBlank.
+    pub fn vram_dma_active(&self) -> bool {
+        self.vram_dma.active()
     }
 
     /// True while FF46 has an unfinished OAM transfer.
     pub fn oam_dma_active(&self) -> bool {
         self.dma.active()
+    }
+
+    /// VRAM DMA source reads do not consult CPU LCD-mode access gating.
+    /// Unsupported, absent cartridge RAM and invalid VRAM sources are FF
+    /// placeholders, not claims about physical open-bus signal behavior.
+    fn read_vram_dma_source(&self, address: u16) -> u8 {
+        match address {
+            0x0000..=0x7FFF => self.cartridge.read_rom(address).unwrap_or(0xFF),
+            0xA000..=0xBFFF => 0xFF,
+            0xC000..=0xDFFF => self.wram.read(address).unwrap_or(0xFF),
+            _ => 0xFF,
+        }
     }
 
     /// Source reads bypass CPU LCD-mode access restrictions.
@@ -150,6 +182,7 @@ impl Bus {
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read(address),
             0xFF46 => Some(self.dma.source_high()),
             0xFF4F => self.vram.read_bank_register(),
+            0xFF51..=0xFF55 if self.mode == HardwareMode::Cgb => self.vram_dma.read(address),
             0xFF68..=0xFF6B => self.ppu.read(address),
             0xFF70 => self.wram.read_bank_register(),
             0xFF80..=0xFFFE => self.hram.read(address),
@@ -184,13 +217,20 @@ impl Bus {
                 true
             }
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => {
-                self.ppu.write(address, value, &mut self.interrupts)
+                let written = self.ppu.write(address, value, &mut self.interrupts);
+                if address == 0xFF40 && !self.ppu.lcd_enabled() {
+                    self.vram_dma.lcd_disabled();
+                }
+                written
             }
             0xFF46 => {
                 self.dma.start(value);
                 true
             }
             0xFF4F => self.vram.write_bank_register(value),
+            0xFF51..=0xFF55 if self.mode == HardwareMode::Cgb => {
+                self.vram_dma.write(address, value, self.ppu.lcd_enabled())
+            }
             0xFF68..=0xFF6B => self.ppu.write(address, value, &mut self.interrupts),
             0xFF70 => self.wram.write_bank_register(value),
             0xFF80..=0xFFFE => self.hram.write(address, value),
