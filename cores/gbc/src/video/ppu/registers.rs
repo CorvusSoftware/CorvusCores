@@ -1,12 +1,12 @@
 // SPDX-FileCopyrightText: 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! Memory-mapped LCD control/status, scrolling and monochrome palettes.
+//! LCD status, scrolling, DMG palettes, and CGB background palette RAM.
 //!
-//! Scroll and palette registers are stored but not yet consumed by a renderer.
-//! DMA ($FF46) and CGB palette RAM registers are intentionally unmapped.
+//! DMA ($FF46) and CGB object palettes ($FF6A/$FF6B) remain unmapped.
 
 use super::{Mode, Ppu};
+use super::background::WHITE;
 use crate::interrupts::InterruptController;
 
 impl Ppu {
@@ -27,6 +27,10 @@ impl Ppu {
             0xFF49 => Some(self.obp1),
             0xFF4A => Some(self.wy),
             0xFF4B => Some(self.wx),
+            0xFF68 if self.cgb_mode => Some(self.bg_palette.read_index()),
+            0xFF69 if self.cgb_mode => Some(
+                self.bg_palette.read_data(self.lcd_enabled() && self.mode == Mode::Transfer),
+            ),
             _ => None,
         }
     }
@@ -50,6 +54,9 @@ impl Ppu {
                         Mode::HBlank
                     };
                     self.stat_line = false;
+                    if !self.lcd_enabled() {
+                        self.framebuffer.fill(WHITE);
+                    }
                     self.update_stat_line(interrupts);
                 }
             }
@@ -70,6 +77,10 @@ impl Ppu {
             0xFF49 => self.obp1 = value,
             0xFF4A => self.wy = value,
             0xFF4B => self.wx = value,
+            0xFF68 if self.cgb_mode => self.bg_palette.write_index(value),
+            0xFF69 if self.cgb_mode => self
+                .bg_palette
+                .write_data(value, self.lcd_enabled() && self.mode == Mode::Transfer),
             _ => return false,
         }
         true
