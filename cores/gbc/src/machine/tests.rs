@@ -316,3 +316,39 @@ fn machine_exposes_rgb555_background_pixels_after_cpu_halt_steps() {
     assert_eq!(machine.bus().framebuffer()[crate::SCREEN_WIDTH], 0x7FFF);
     assert_eq!(machine.elapsed_t_cycles(), 252);
 }
+
+#[test]
+fn machine_composites_window_and_objects_into_rgb555_framebuffer() {
+    let mut machine = fixture(&[0x76]); // CGB fixture, HALT keeps PPU clocked.
+    let bus = machine.bus_mut();
+    assert!(bus.write(0x8010, 0xFF)); // window tile 1: color 1 across row 0
+    assert!(bus.write(0x8021, 0xFF)); // object tile 2: color 2 across row 0
+    assert!(bus.write(0x9C00, 1)); // window map entries
+    assert!(bus.write(0x9C01, 1));
+    for (address, value) in [
+        (0xFE00, 16), // sprite Y=0
+        (0xFE01, 8),  // sprite X=0
+        (0xFE02, 2),  // OBJ tile 2
+        (0xFE03, 0),  // OBJ palette 0
+    ] {
+        assert!(bus.write(address, value));
+    }
+    assert!(bus.write(0xFF68, 0x82)); // BG palette 0, color 1
+    assert!(bus.write(0xFF69, 0x1F)); // RGB555 red
+    assert!(bus.write(0xFF69, 0));
+    assert!(bus.write(0xFF6A, 0x84)); // OBJ palette 0, color 2
+    assert!(bus.write(0xFF6B, 0xE0)); // RGB555 green
+    assert!(bus.write(0xFF6B, 0x03));
+    assert!(bus.write(0xFF4B, 7)); // window starts at X=0
+    assert!(bus.write(0xFF40, 0xF3)); // LCD, window, OBJ, BG
+
+    for _ in 0..63 {
+        assert_eq!(machine.step(), Ok(4));
+    }
+    assert_eq!(machine.elapsed_t_cycles(), 252);
+    assert_eq!(machine.bus().framebuffer()[0], 0x03E0); // sprite covers window
+    assert_eq!(machine.bus().framebuffer()[7], 0x03E0);
+    assert_eq!(machine.bus().framebuffer()[8], 0x001F); // visible window
+    assert_eq!(machine.bus().framebuffer()[16], 0x7FFF); // blank next tile
+    assert_eq!(machine.bus().read(0xFF6A), Some(0x86));
+}
