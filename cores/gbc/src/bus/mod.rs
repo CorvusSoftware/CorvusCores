@@ -22,6 +22,8 @@ mod cpu_access;
 #[cfg(test)]
 mod dma_tests;
 #[cfg(test)]
+mod mbc3_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod timing_tests;
