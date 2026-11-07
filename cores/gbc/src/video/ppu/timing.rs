@@ -5,7 +5,7 @@
 
 use super::{Mode, Ppu};
 use crate::interrupts::{Interrupt, InterruptController};
-use crate::video::VideoRam;
+use crate::video::{ObjectRam, VideoRam};
 
 const DOTS_PER_LINE: u16 = 456;
 const OAM_DOTS: u16 = 80;
@@ -23,6 +23,7 @@ impl Ppu {
         &mut self,
         dots: u32,
         vram: &VideoRam,
+        oam: &ObjectRam,
         interrupts: &mut InterruptController,
     ) {
         if !self.lcd_enabled() {
@@ -36,9 +37,16 @@ impl Ppu {
                 self.ly = if self.ly == LAST_LINE { 0 } else { self.ly + 1 };
 
                 if self.ly == FIRST_VBLANK_LINE {
+                    self.window_y_triggered = false;
                     self.mode = Mode::VBlank;
                     interrupts.request(Interrupt::VBlank);
                 } else if self.ly < FIRST_VBLANK_LINE {
+                    if self.ly == 0 {
+                        self.window_line = 0;
+                    }
+                    if self.ly == self.wy {
+                        self.window_y_triggered = true;
+                    }
                     self.mode = Mode::OamScan;
                 }
                 self.update_stat_line(interrupts);
@@ -50,6 +58,8 @@ impl Ppu {
                     }
                     TRANSFER_END_DOT => {
                         self.render_background_line(vram);
+                        self.render_window_line(vram);
+                        self.render_objects_line(vram, oam);
                         self.mode = Mode::HBlank;
                         self.update_stat_line(interrupts);
                     }
