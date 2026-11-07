@@ -25,7 +25,7 @@ impl Cpu {
         Ok(u16::from_le_bytes([low, high]))
     }
 
-    fn read_r8(&self, code: u8, bus: &Bus) -> Result<u8, CpuError> {
+    pub(super) fn read_r8(&self, code: u8, bus: &Bus) -> Result<u8, CpuError> {
         let r = &self.registers;
         match code {
             0 => Ok(r.b),
@@ -42,7 +42,7 @@ impl Cpu {
         }
     }
 
-    fn write_r8(&mut self, code: u8, value: u8, bus: &mut Bus) -> Result<(), CpuError> {
+    pub(super) fn write_r8(&mut self, code: u8, value: u8, bus: &mut Bus) -> Result<(), CpuError> {
         let r = &mut self.registers;
         match code {
             0 => r.b = value,
@@ -85,6 +85,10 @@ impl Cpu {
 
         let cycles = match opcode {
             0x00 => 4, // NOP
+            0xCB => {
+                let cb_opcode = self.fetch8(bus)?;
+                self.execute_cb(cb_opcode, bus)?
+            }
             0x01 | 0x11 | 0x21 | 0x31 => {
                 let value = self.fetch16(bus)?;
                 self.registers.write_pair((opcode >> 4) & 0x03, value);
