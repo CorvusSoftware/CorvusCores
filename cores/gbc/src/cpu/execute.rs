@@ -102,6 +102,31 @@ impl Cpu {
                 self.registers.write_pair(pair, result);
                 8
             }
+            0x07 | 0x0F | 0x17 | 0x1F => {
+                self.rotate_accumulator(opcode);
+                4
+            }
+            0x09 | 0x19 | 0x29 | 0x39 => {
+                let value = self.registers.read_pair((opcode >> 4) & 0x03);
+                self.add_hl(value);
+                8
+            }
+            0x27 => {
+                self.daa();
+                4
+            }
+            0x2F => {
+                self.complement_a();
+                4
+            }
+            0x37 => {
+                self.set_carry();
+                4
+            }
+            0x3F => {
+                self.complement_carry();
+                4
+            }
             0x0B | 0x1B | 0x2B | 0x3B => {
                 let pair = (opcode >> 4) & 0x03;
                 let result = self.registers.read_pair(pair).wrapping_sub(1);
@@ -151,68 +176,19 @@ impl Cpu {
                     4
                 }
             }
-            0x80..=0x87 => {
-                let source = opcode & 7;
+            0x80..=0xBF => {
+                let source = opcode & 0x07;
                 let value = self.read_r8(source, bus)?;
-                self.add_a(value);
+                self.alu_a((opcode >> 3) & 0x07, value);
                 if source == 6 {
                     8
                 } else {
                     4
                 }
             }
-            0x90..=0x97 => {
-                let source = opcode & 7;
-                let value = self.read_r8(source, bus)?;
-                self.sub_a(value, true);
-                if source == 6 {
-                    8
-                } else {
-                    4
-                }
-            }
-            0xA8..=0xAF => {
-                let source = opcode & 7;
-                let value = self.read_r8(source, bus)?;
-                self.registers.a ^= value;
-                self.registers
-                    .set_flags(if self.registers.a == 0 { FLAG_ZERO } else { 0 });
-                if source == 6 {
-                    8
-                } else {
-                    4
-                }
-            }
-            0xB8..=0xBF => {
-                let source = opcode & 7;
-                let value = self.read_r8(source, bus)?;
-                self.sub_a(value, false);
-                if source == 6 {
-                    8
-                } else {
-                    4
-                }
-            }
-            0xC6 => {
+            0xC6 | 0xCE | 0xD6 | 0xDE | 0xE6 | 0xEE | 0xF6 | 0xFE => {
                 let value = self.fetch8(bus)?;
-                self.add_a(value);
-                8
-            }
-            0xD6 => {
-                let value = self.fetch8(bus)?;
-                self.sub_a(value, true);
-                8
-            }
-            0xEE => {
-                let value = self.fetch8(bus)?;
-                self.registers.a ^= value;
-                self.registers
-                    .set_flags(if self.registers.a == 0 { FLAG_ZERO } else { 0 });
-                8
-            }
-            0xFE => {
-                let value = self.fetch8(bus)?;
-                self.sub_a(value, false);
+                self.alu_a((opcode >> 3) & 0x07, value);
                 8
             }
             0x18 => {
@@ -233,6 +209,17 @@ impl Cpu {
                     12
                 } else {
                     8
+                }
+            }
+            0xE8 | 0xF8 => {
+                let displacement = self.fetch8(bus)? as i8;
+                let result = self.sp_plus_signed(displacement);
+                if opcode == 0xE8 {
+                    self.registers.sp = result;
+                    16
+                } else {
+                    self.registers.set_hl(result);
+                    12
                 }
             }
             0x08 => {
