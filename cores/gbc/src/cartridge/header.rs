@@ -2,6 +2,8 @@
 //!
 //! Hardware reference: <https://gbdev.io/pandocs/The_Cartridge_Header.html>
 
+use super::CartridgeError;
+
 pub(super) const MIN_HEADER_LENGTH: usize = 0x150;
 
 /// Compatibility advertised by a cartridge header, not the current hardware mode.
