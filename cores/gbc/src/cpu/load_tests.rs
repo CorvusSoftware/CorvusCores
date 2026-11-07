@@ -73,11 +73,10 @@ fn hl_indexing_wraps_without_overflow_or_fake_hardware_access() {
     assert_eq!(cpu.step(&mut bus), Ok(8));
     assert_eq!(bus.read(0xFFFE), Some(0x91));
     assert_eq!(cpu.registers.hl(), 0xFFFF);
-    assert_eq!(
-        cpu.step(&mut bus),
-        Err(CpuError::UnmappedWrite { address: 0xFFFF })
-    );
-    assert_eq!(cpu.registers.hl(), 0xFFFF);
+    // FFFF is now the mapped interrupt enable register, not an I/O hole.
+    assert_eq!(cpu.step(&mut bus), Ok(8));
+    assert_eq!(bus.read(0xFFFF), Some(0x91));
+    assert_eq!(cpu.registers.hl(), 0xFFFE);
 
     // A write to ROM-only address 0000 is a valid no-op; HL still wraps.
     let (mut cpu, mut bus) = fixture(&[0x32, 0x3A]);
@@ -178,19 +177,19 @@ fn unsupported_io_transfers_report_errors_and_keep_registers_intact() {
 fn indirect_loads_do_not_modify_hl_or_a_when_the_bus_rejects_access() {
     for opcode in [0x02, 0x0A, 0x12, 0x1A, 0x22, 0x2A, 0x32, 0x3A] {
         let (mut cpu, mut bus) = fixture(&[opcode]);
-        cpu.registers.set_bc(0xFFFF);
-        cpu.registers.set_de(0xFFFF);
-        cpu.registers.set_hl(0xFFFF);
+        cpu.registers.set_bc(0xFF46);
+        cpu.registers.set_de(0xFF46);
+        cpu.registers.set_hl(0xFF46);
         cpu.registers.a = 0xBD;
         cpu.registers.set_flags(FLAG_ZERO | FLAG_SUBTRACT);
 
         let expected = if [0x02, 0x12, 0x22, 0x32].contains(&opcode) {
-            CpuError::UnmappedWrite { address: 0xFFFF }
+            CpuError::UnmappedWrite { address: 0xFF46 }
         } else {
-            CpuError::UnmappedRead { address: 0xFFFF }
+            CpuError::UnmappedRead { address: 0xFF46 }
         };
         assert_eq!(cpu.step(&mut bus), Err(expected), "opcode {opcode:02X}");
-        assert_eq!(cpu.registers.hl(), 0xFFFF);
+        assert_eq!(cpu.registers.hl(), 0xFF46);
         assert_eq!(cpu.registers.a, 0xBD);
         assert_eq!(cpu.registers.flags(), FLAG_ZERO | FLAG_SUBTRACT);
         assert_eq!(cpu.registers.pc, 1);
