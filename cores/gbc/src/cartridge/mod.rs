@@ -3,7 +3,7 @@
 
 //! Cartridge header decoding and mapper implementations.
 
-mod cartridge;
+mod mapper;
 mod error;
 mod header;
 mod mbc1;
