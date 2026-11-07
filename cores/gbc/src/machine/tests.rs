@@ -299,6 +299,7 @@ fn machine_exposes_rgb555_background_pixels_after_cpu_halt_steps() {
     );
 
     assert!(machine.bus_mut().write(0x8000, 0xFF)); // tile 0 row 0, color 1
+    assert!(machine.bus_mut().write(0x9801, 1)); // next map cell uses blank tile 1
     assert!(machine.bus_mut().write(0xFF68, 0x82)); // palette 0, color 1
     assert!(machine.bus_mut().write(0xFF69, 0xE0)); // RGB555 green, low byte
     assert!(machine.bus_mut().write(0xFF69, 0x03)); // high byte
