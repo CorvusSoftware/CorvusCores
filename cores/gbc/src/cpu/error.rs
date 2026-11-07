@@ -22,7 +22,10 @@ impl fmt::Display for CpuError {
                 write!(f, "CPU write to unimplemented address 0x{address:04X}")
             }
             Self::UnsupportedOpcode { address, opcode } => {
-                write!(f, "opcode 0x{opcode:02X} at 0x{address:04X} is not implemented")
+                write!(
+                    f,
+                    "opcode 0x{opcode:02X} at 0x{address:04X} is not implemented"
+                )
             }
         }
     }
