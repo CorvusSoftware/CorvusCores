@@ -6,7 +6,7 @@
 use super::{Cpu, FLAG_CARRY, FLAG_HALF_CARRY, FLAG_SUBTRACT, FLAG_ZERO};
 
 impl Cpu {
-    fn increment8(&mut self, value: u8) -> u8 {
+    pub(super) fn increment8(&mut self, value: u8) -> u8 {
         let result = value.wrapping_add(1);
         let mut flags = self.registers.flags() & FLAG_CARRY;
         if result == 0 {
@@ -19,7 +19,7 @@ impl Cpu {
         result
     }
 
-    fn decrement8(&mut self, value: u8) -> u8 {
+    pub(super) fn decrement8(&mut self, value: u8) -> u8 {
         let result = value.wrapping_sub(1);
         let mut flags = (self.registers.flags() & FLAG_CARRY) | FLAG_SUBTRACT;
         if result == 0 {
@@ -32,7 +32,7 @@ impl Cpu {
         result
     }
 
-    fn add_a(&mut self, value: u8) {
+    pub(super) fn add_a(&mut self, value: u8) {
         let a = self.registers.a;
         let (result, carry) = a.overflowing_add(value);
         self.registers.a = result;
@@ -49,7 +49,7 @@ impl Cpu {
         self.registers.set_flags(flags);
     }
 
-    fn sub_a(&mut self, value: u8, store: bool) {
+    pub(super) fn sub_a(&mut self, value: u8, store: bool) {
         let a = self.registers.a;
         let result = a.wrapping_sub(value);
         if store {
