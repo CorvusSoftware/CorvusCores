@@ -4,8 +4,8 @@
 //! Deterministic PPU register, dot, LY and interrupt regression tests.
 
 use super::Ppu;
-use crate::video::VideoRam;
 use crate::interrupts::{Interrupt, InterruptController};
+use crate::video::VideoRam;
 
 fn write(ppu: &mut Ppu, irq: &mut InterruptController, address: u16, value: u8) {
     assert!(ppu.write(address, value, irq));
