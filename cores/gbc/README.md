@@ -56,7 +56,7 @@ src/
         └── tests.rs    # LCD mode and interrupt regression tests
 ```
 
-Components are grouped by responsibility. Future audio, DMA, and input components should receive their own modules when there is functioning code for them. Avoid concentrating unrelated hardware in `lib.rs` or the bus. Avoid concentrating unrelated hardware in `lib.rs` or the bus.
+Components are grouped by responsibility. Future audio, DMA, and input components should receive their own modules when there is functioning code for them. Avoid concentrating unrelated hardware in `lib.rs` or the bus.
 
 ## Implemented foundations
 
