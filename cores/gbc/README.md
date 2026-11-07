@@ -8,9 +8,12 @@ This directory contains the independently developed **Game Boy Color core** for 
 src/
 ├── lib.rs              # Crate modules
 ├── bus/
-│   ├── mod.rs          # CPU video access gating, DMA and memory routing
-│   ├── dma_tests.rs    # OAM DMA transfers and LCD-mode CPU access tests
-│   ├── vram_dma_tests.rs # GDMA/HDMA bus and HBlank tests
+│   ├── mod.rs          # Bus ownership, hardware mode and interrupt facade
+│   ├── cpu_access.rs   # CPU memory routing and LCD-mode access gating
+│   ├── clock.rs        # Peripheral T-cycle order and internal DMA reads
+│   ├── tests.rs        # ROM, banking and unmapped-I/O routing contracts
+│   ├── dma_tests.rs    # OAM DMA transfers and CPU access restrictions
+│   ├── vram_dma_tests.rs # CGB GDMA/HDMA bus and HBlank tests
 │   └── timing_tests.rs # Timer/interrupt bus integration tests
 ├── cpu/
 │   ├── mod.rs          # CPU state and public exports
@@ -71,6 +74,8 @@ src/
 ```
 
 Components are grouped by responsibility. Future audio and input components should receive their own modules when there is functioning code for them. Avoid concentrating unrelated hardware in `lib.rs` or the bus.
+
+The bus maintains a single owner for cartridge, memories, timers, PPU and both DMA controllers. Its CPU-visible `read`/`write` routing lives in `bus/cpu_access.rs`; peripheral scheduling and distinct internal DMA source paths live in `bus/clock.rs`. The public `Bus` methods, register semantics and per-T-cycle ordering are unchanged by this structural refactor. Future cartridge mapper integration should extend the cartridge component instead of expanding unrelated bus responsibilities.
 
 ## Implemented foundations
 
