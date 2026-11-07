@@ -108,9 +108,14 @@ mod tests {
     fn routes_vram_wram_echo_oam_and_hram() {
         let mut bus = test_bus(0xC0);
         for (addr, value) in [
-            (0x8000, 1), (0x9FFF, 2), (0xC000, 3),
-            (0xD000, 4), (0xFE00, 5), (0xFE9F, 6),
-            (0xFF80, 7), (0xFFFE, 8),
+            (0x8000, 1),
+            (0x9FFF, 2),
+            (0xC000, 3),
+            (0xD000, 4),
+            (0xFE00, 5),
+            (0xFE9F, 6),
+            (0xFF80, 7),
+            (0xFFFE, 8),
         ] {
             assert!(bus.write(addr, value));
             assert_eq!(bus.read(addr), Some(value));
