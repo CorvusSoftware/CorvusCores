@@ -4,8 +4,6 @@ use super::*;
 use super::header::MIN_HEADER_LENGTH;
 use super::rom_only::ROM_ONLY_LENGTH;
 
-use super::*;
-
 fn test_rom(cgb_flag: u8, cartridge_type: u8, rom_size_code: u8) -> Vec<u8> {
     let mut rom = vec![0_u8; ROM_ONLY_LENGTH];
     rom[0x0143] = cgb_flag;
