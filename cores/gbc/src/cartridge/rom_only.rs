@@ -28,6 +28,11 @@ impl RomOnlyCartridge {
                 code: header.rom_size_code,
             });
         }
+        if header.ram_size_code != 0x00 {
+            return Err(CartridgeError::UnsupportedRamSizeCode {
+                code: header.ram_size_code,
+            });
+        }
         if rom.len() != ROM_ONLY_LENGTH {
             return Err(CartridgeError::IncorrectRomOnlyLength { actual: rom.len() });
         }
