@@ -78,12 +78,7 @@ fn gdma_pauses_increment_only_stall_cycles_then_resume_cpu() {
 fn cpu_instruction_that_starts_gdma_still_counts_as_cpu_step() {
     // LD A,00 ; LDH (55),A ; NOP
     let mut machine = fixture(&[0x3E, 0x00, 0xE0, 0x55, 0x00]);
-    for (address, value) in [
-        (0xFF51, 0xC0),
-        (0xFF52, 0),
-        (0xFF53, 0),
-        (0xFF54, 0),
-    ] {
+    for (address, value) in [(0xFF51, 0xC0), (0xFF52, 0), (0xFF53, 0), (0xFF54, 0)] {
         assert!(machine.bus_mut().write(address, value));
     }
     assert_eq!(machine.step(), Ok(8));
