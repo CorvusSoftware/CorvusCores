@@ -46,7 +46,7 @@ fn dmg_bgp_can_remap_raw_tile_colors_without_changing_vram() {
     lcd_write(&mut ppu, &mut irq, 0xFF47, 0x0C); // color 1 -> shade 3
     lcd_write(&mut ppu, &mut irq, 0xFF40, 0x91);
 
-    render_line(&mut ppu, &vram, &ObjectRam::new(), &mut irq);
+    render_line(&mut ppu, &vram, &mut irq);
     assert_eq!(ppu.framebuffer()[0], 0x0000);
     assert_eq!(ppu.framebuffer()[7], 0x0000);
     assert_eq!(ppu.framebuffer()[8], 0x7FFF); // next tile is color 0
@@ -68,7 +68,7 @@ fn signed_and_unsigned_tile_data_and_both_background_maps() {
         let mut ppu = Ppu::new(false);
         lcd_write(&mut ppu, &mut irq, 0xFF47, 0xE4);
         lcd_write(&mut ppu, &mut irq, 0xFF40, lcdc);
-        render_line(&mut ppu, &vram, &ObjectRam::new(), &mut irq);
+        render_line(&mut ppu, &vram, &mut irq);
         assert_eq!(ppu.framebuffer()[0], expected, "LCDC={lcdc:02X}");
     }
 }
@@ -91,7 +91,7 @@ fn scrolling_wraps_at_256_pixels_horizontally_and_vertically() {
     lcd_write(&mut ppu, &mut irq, 0xFF47, 0xE4);
     lcd_write(&mut ppu, &mut irq, 0xFF40, 0x91);
 
-    render_line(&mut ppu, &vram, &ObjectRam::new(), &mut irq);
+    render_line(&mut ppu, &vram, &mut irq);
     assert_eq!(ppu.framebuffer()[0], 0x56B5);
     assert_eq!(ppu.framebuffer()[8], 0x294A);
 
@@ -144,8 +144,8 @@ fn dmg_bit_zero_blanks_background_but_cgb_still_draws_it() {
     lcd_write(&mut cgb, &mut irq, 0xFF69, 0x00);
     lcd_write(&mut cgb, &mut irq, 0xFF40, 0x90);
 
-    render_line(&mut dmg, &dmg_vram, &ObjectRam::new(), &mut irq);
-    render_line(&mut cgb, &cgb_vram, &ObjectRam::new(), &mut irq);
+    render_line(&mut dmg, &dmg_vram, &mut irq);
+    render_line(&mut cgb, &cgb_vram, &mut irq);
     assert_eq!(dmg.framebuffer()[0], 0x7FFF);
     assert_eq!(cgb.framebuffer()[0], 0x001F);
 }
@@ -167,7 +167,7 @@ fn cgb_attributes_select_vram_bank_palette_and_horizontal_vertical_flip() {
     lcd_write(&mut ppu, &mut irq, 0xFF69, 0x1F); // pure red RGB555
     lcd_write(&mut ppu, &mut irq, 0xFF69, 0x00);
     lcd_write(&mut ppu, &mut irq, 0xFF40, 0x91);
-    render_line(&mut ppu, &vram, &ObjectRam::new(), &mut irq);
+    render_line(&mut ppu, &vram, &mut irq);
 
     assert_eq!(ppu.framebuffer()[0], 0x001F);
     assert_eq!(ppu.framebuffer()[1], 0x7FFF);
