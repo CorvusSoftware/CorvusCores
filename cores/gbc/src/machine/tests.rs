@@ -188,3 +188,103 @@ fn an_unsupported_instruction_does_not_advance_timer_or_cycle_counter() {
     assert_eq!(machine.bus().read(0xFF05), Some(1));
     assert_eq!(machine.elapsed_t_cycles(), 0);
 }
+
+#[test]
+fn machine_cpu_can_enable_lcd_and_advance_ppu_modes() {
+    // LD A,80 ; LDH (40),A ; followed by NOP instructions.
+    let mut machine = fixture(&[0x3E, 0x80, 0xE0, 0x40]);
+    assert_eq!(machine.bus().read(0xFF40), Some(0));
+
+    assert_eq!(machine.step(), Ok(8));
+    assert_eq!(machine.bus().read(0xFF44), Some(0));
+    assert_eq!(machine.step(), Ok(12));
+    assert_eq!(machine.bus().read(0xFF40), Some(0x80));
+    assert_eq!(machine.bus().read(0xFF41).unwrap() & 3, 2);
+
+    // LCDC writes happen before the runner clocks the 12-cycle LDH.
+    for _ in 0..17 {
+        assert_eq!(machine.step(), Ok(4));
+    }
+    assert_eq!(machine.bus().read(0xFF41).unwrap() & 3, 3); // 80 dots
+    for _ in 0..43 {
+        assert_eq!(machine.step(), Ok(4));
+    }
+    assert_eq!(machine.bus().read(0xFF41).unwrap() & 3, 0); // 252 dots
+    for _ in 0..51 {
+        assert_eq!(machine.step(), Ok(4));
+    }
+    assert_eq!(machine.bus().read(0xFF44), Some(1)); // 456 dots
+    assert_eq!(machine.bus().read(0xFF41).unwrap() & 3, 2);
+    assert_eq!(machine.elapsed_t_cycles(), 8 + 12 + 111 * 4);
+}
+
+#[test]
+fn lcd_keeps_advancing_during_halt_idle_steps() {
+    let mut machine = fixture(&[0x76]); // HALT
+    assert!(machine.bus_mut().write(0xFF40, 0x80));
+
+    assert_eq!(machine.step(), Ok(4));
+    assert!(machine.cpu().is_halted());
+    for _ in 0..19 {
+        assert_eq!(machine.step(), Ok(4));
+    }
+    assert_eq!(machine.bus().read(0xFF41).unwrap() & 3, 3);
+    for _ in 0..94 {
+        assert_eq!(machine.step(), Ok(4));
+    }
+    assert_eq!(machine.bus().read(0xFF44), Some(1));
+    assert_eq!(machine.bus().read(0xFF41).unwrap() & 3, 2);
+    assert_eq!(machine.elapsed_t_cycles(), 456);
+}
+
+#[test]
+fn ppu_stat_irq_is_serviced_at_the_next_machine_step() {
+    // EI ; NOP ; HALT. Mode 0 STAT IRQ is generated at 252 LCD dots.
+    let mut machine = fixture(&[0xFB, 0x00, 0x76]);
+    machine.cpu_mut().registers.sp = 0xC100;
+    assert!(machine.bus_mut().write(0xFFFF, Interrupt::LcdStat.mask()));
+    assert!(machine.bus_mut().write(0xFF41, 0x08));
+    assert!(machine.bus_mut().write(0xFF40, 0x80));
+
+    assert_eq!(machine.step(), Ok(4)); // EI
+    assert_eq!(machine.step(), Ok(4)); // NOP, enables IME
+    assert_eq!(machine.step(), Ok(4)); // HALT
+    for _ in 0..60 {
+        assert_eq!(machine.step(), Ok(4));
+    }
+    assert_eq!(machine.elapsed_t_cycles(), 252);
+    assert_eq!(machine.bus().read(0xFF41).unwrap() & 3, 0);
+    assert_eq!(machine.bus().read(0xFF0F), Some(0xE2));
+
+    assert_eq!(machine.step(), Ok(20));
+    assert_eq!(machine.cpu().registers.pc, Interrupt::LcdStat.vector());
+    assert_eq!(machine.bus().read(0xFF0F), Some(0xE0));
+    assert_eq!(machine.bus().read(0xC0FE), Some(3));
+    assert_eq!(machine.bus().read(0xC0FF), Some(0));
+}
+
+#[test]
+fn ppu_requests_vblank_once_at_line_144_during_cpu_halt() {
+    let mut machine = fixture(&[0xFB, 0x00, 0x76]);
+    machine.cpu_mut().registers.sp = 0xC100;
+    assert!(machine.bus_mut().write(0xFFFF, Interrupt::VBlank.mask()));
+    assert!(machine.bus_mut().write(0xFF40, 0x80));
+
+    assert_eq!(machine.step(), Ok(4)); // EI
+    assert_eq!(machine.step(), Ok(4)); // NOP
+    assert_eq!(machine.step(), Ok(4)); // HALT
+    assert!(machine.cpu().is_halted());
+    // 144 * 456 = 65,664 dots; the first three CPU steps took 12.
+    for _ in 0..16_413 {
+        assert_eq!(machine.step(), Ok(4));
+    }
+    assert_eq!(machine.elapsed_t_cycles(), 65_664);
+    assert_eq!(machine.bus().read(0xFF44), Some(144));
+    assert_eq!(machine.bus().read(0xFF41).unwrap() & 3, 1);
+    assert_eq!(machine.bus().read(0xFF0F), Some(0xE1));
+
+    assert_eq!(machine.step(), Ok(20));
+    assert_eq!(machine.cpu().registers.pc, Interrupt::VBlank.vector());
+    assert_eq!(machine.bus().read(0xFF0F), Some(0xE0));
+    assert_eq!(machine.elapsed_t_cycles(), 65_684);
+}

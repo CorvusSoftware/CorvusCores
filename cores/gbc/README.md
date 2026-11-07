@@ -37,8 +37,8 @@ src/
 │   ├── wram.rs         # Work RAM banking and echo region
 │   └── hram.rs         # High RAM
 ├── machine/
-│   ├── mod.rs          # Instruction-boundary CPU/timer clocking
-│   └── tests.rs        # HALT, timer and interrupt integration tests
+│   ├── mod.rs          # Instruction-boundary CPU/peripheral clocking
+│   └── tests.rs        # HALT, timer, LCD and interrupt integration tests
 ├── interrupts/
 │   ├── mod.rs          # IF/IE, request flags, priority and vectors
 │   └── tests.rs        # Register and priority regression tests
@@ -48,17 +48,22 @@ src/
 └── video/
     ├── mod.rs
     ├── vram.rs         # VRAM banks, VBK register
-    └── oam.rs          # Object attribute memory
+    ├── oam.rs          # Object attribute memory
+    └── ppu/
+        ├── mod.rs      # LCD state and PPU mode definitions
+        ├── registers.rs # LCDC/STAT/LY/LYC, scroll and palette registers
+        ├── timing.rs   # Nominal scanline, VBlank and STAT edge timing
+        └── tests.rs    # LCD mode and interrupt regression tests
 ```
 
-Components are grouped by responsibility. Future CPU, PPU, audio, DMA, timer, and input components should receive their own modules when there is functioning code for them. Avoid concentrating unrelated hardware in `lib.rs` or the bus.
+Components are grouped by responsibility. Future audio, DMA, and input components should receive their own modules when there is functioning code for them. Avoid concentrating unrelated hardware in `lib.rs` or the bus.
 
 ## Implemented foundations
 
 - Cartridge header parsing: CGB compatibility, cartridge type and RAM/ROM size fields, header checksum.
 - 32 KiB ROM-only cartridge loading and reading. Unsupported mapper types and sizes are rejected.
 - Partial bus access with explicit unsupported reads/writes and manual T-cycle advance through `Bus::tick_t_cycles`. Standalone `Cpu::step` deliberately does not tick peripherals.
-- An instruction-boundary `Machine` runner owns a CPU and bus, advances the timer once by each successful CPU step's nominal T-cycles, and counts elapsed T-cycles. It clocks HALT idle steps and interrupt entry too. A timer request generated during one step is observed on the next. This is **not** per-M-cycle/per-memory-access synchronization.
+- An instruction-boundary `Machine` runner owns a CPU and bus, advances the timer and nominal LCD mode clock once by each successful CPU step's T-cycles, and counts elapsed cycles. It clocks HALT idle steps and interrupt entry too. A timer or LCD interrupt generated during one step is observed on the next. This is **not** per-M-cycle/per-memory-access synchronization.
 - Timer registers `FF04–FF07`: 16-bit divider, all four TIMA clock selections, falling-edge increments, DIV reset, active TAC source switching, 4-T-cycle delayed TIMA reload and interrupt request. TIMA writes during a pending reload cancel that reload.
 - Interrupt registers IF (`FF0F`) and IE (`FFFF`): software and device requests, five priority levels, vector lookup, mask filtering, and acknowledgement.
 - SM83 interrupt handling: private CPU IME flag, delayed EI, immediate DI and RETI, priority vector service (20 nominal T-cycles), IF acknowledgement, return-address stack writes, HALT sleep/wake, and the pending-interrupt HALT bug. HALT idle steps and interrupt entry do not automatically tick the bus.
@@ -70,15 +75,17 @@ Components are grouped by responsibility. Future CPU, PPU, audio, DMA, timer, an
 - Explicit CPU errors for unsupported opcodes and unmapped hardware, rather than silently returning success.
 - 8 banks of WRAM in CGB mode, including `FF70` (SVBK), fixed bank 0, switchable banks 1–7, and the `E000–FDFF` echo.
 - 2 VRAM banks in CGB mode, selected through `FF4F` (VBK).
+- First PPU milestone: LCDC/STAT, LY/LYC and scroll/window/DMG palette register storage (FF40–FF45 and FF47–FF4B); nominal mode 2/3/0 progression across 456-dot visible scanlines, VBlank on LY=144–153, VBlank IRQ on line 144 and edge-triggered shared STAT IRQ. LCD disable resets and freezes the line clock. DMA (FF46) remains unimplemented.
+- **Simplified LCD timings:** mode 2 lasts 80 dots, mode 3 always 172 dots, and mode 0 uses the remaining 204 dots. Real mode 3 varies with scroll/window/object fetch stalls; the LY=153 early rollover, LCD startup details, pixel rendering, VRAM/OAM access blocking and CGB double-speed clock conversion are not modeled.
 - HRAM at `FF80–FFFE` and OAM storage at `FE00–FE9F`.
 - Basic differences between color mode and original Game Boy compatibility mode for the implemented bank selection.
 - Tests with synthetic, self-authored cartridge data and boundary/banking cases.
 
 ## Not implemented yet
 
-**No games can execute end to end.** STOP and CGB speed-switching, boot behavior, fine-grained interrupt bus timing and cycle-accurate scheduling are not yet implemented. The CGB-specific edge cases for TAC writes and same-cycle timer reload writes still require hardware-reference verification. There is no PPU renderer or timing, APU, joypad, DMA, save states, or MBC1/MBC3/MBC5. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
+**No games can execute end to end.** STOP and CGB speed-switching, boot behavior, fine-grained interrupt/bus timing and cycle-accurate scheduling are not yet implemented. The CGB-specific edge cases for TAC writes and same-cycle timer reload writes still require hardware-reference verification. The PPU currently has only a simplified mode clock and register storage, **no pixel renderer**. APU, joypad, DMA, save states, and MBC1/MBC3/MBC5 are absent. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
 
-The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts (including HALT idle steps and interrupt service) are nominal timings. `Machine::step` automatically advances the timer **after each successful instruction/CPU step**; direct `Cpu::step` calls do not tick the bus. Timer register writes inside an instruction therefore take effect before its entire nominal cycle count is advanced, which is not real hardware timing. No complete scheduler or cycle-accurate CPU-to-bus synchronization exists. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
+The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts (including HALT idle steps and interrupt service) are nominal timings. `Machine::step` automatically advances the timer and nominal LCD dot clock **after each successful instruction/CPU step**; direct `Cpu::step` calls do not tick the bus. Timer and LCD register writes inside an instruction therefore take effect before its entire nominal cycle count is advanced, which is not real hardware timing. No complete scheduler or cycle-accurate CPU-to-bus synchronization exists. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
 
 ## Development
 
@@ -100,5 +107,8 @@ cargo test -p corvus-gbc
 - [Pan Docs — Timer Obscure Behaviour](https://gbdev.io/pandocs/Timer_Obscure_Behaviour.html)
 - [Pan Docs — Interrupts](https://gbdev.io/pandocs/Interrupts.html)
 - [Pan Docs — HALT](https://gbdev.io/pandocs/halt.html)
+- [Pan Docs — LCD Status Registers](https://gbdev.io/pandocs/STAT.html)
+- [Pan Docs — Rendering](https://gbdev.io/pandocs/Rendering.html)
+- [Pan Docs — Interrupt Sources](https://gbdev.io/pandocs/Interrupt_Sources.html)
 
 All project-owned source files carry CorvusSoftware copyright and AGPL-3.0-only SPDX notices; CI enforces these headers. No copyrighted game ROMs or proprietary firmware are included.

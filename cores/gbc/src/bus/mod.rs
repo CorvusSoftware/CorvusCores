@@ -12,7 +12,7 @@ use crate::cartridge::{CgbSupport, RomOnlyCartridge};
 use crate::interrupts::{Interrupt, InterruptController};
 use crate::memory::{HighRam, WorkRam};
 use crate::timer::Timer;
-use crate::video::{ObjectRam, VideoRam};
+use crate::video::{ObjectRam, Ppu, VideoRam};
 
 #[cfg(test)]
 mod timing_tests;
@@ -33,6 +33,7 @@ pub struct Bus {
     hram: HighRam,
     vram: VideoRam,
     oam: ObjectRam,
+    ppu: Ppu,
     timer: Timer,
     interrupts: InterruptController,
 }
@@ -51,6 +52,7 @@ impl Bus {
             hram: HighRam::new(),
             vram: VideoRam::new(color),
             oam: ObjectRam::new(),
+            ppu: Ppu::new(),
             timer: Timer::new(),
             interrupts: InterruptController::new(),
         }
@@ -60,10 +62,12 @@ impl Bus {
         self.mode
     }
 
-    /// Advance the divider and timers by CPU T-cycles. The current Cpu::step
-    /// returns nominal cycles but does not call this method automatically.
+    /// Advance timers and the simplified PPU using normal-speed CPU T-cycles.
+    /// Direct Cpu::step calls do not advance these components automatically.
+    /// CGB double-speed conversion is not implemented.
     pub fn tick_t_cycles(&mut self, cycles: u32) {
         self.timer.tick(cycles, &mut self.interrupts);
+        self.ppu.tick(cycles, &mut self.interrupts);
     }
 
     pub fn request_interrupt(&mut self, interrupt: Interrupt) {
@@ -92,6 +96,7 @@ impl Bus {
             0xFE00..=0xFE9F => self.oam.read(address),
             0xFF04..=0xFF07 => self.timer.read(address),
             0xFF0F => Some(self.interrupts.read_if()),
+            0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read(address),
             0xFF4F => self.vram.read_bank_register(),
             0xFF70 => self.wram.read_bank_register(),
             0xFF80..=0xFFFE => self.hram.read(address),
@@ -112,6 +117,9 @@ impl Bus {
             0xFF0F => {
                 self.interrupts.write_if(value);
                 true
+            }
+            0xFF40..=0xFF45 | 0xFF47..=0xFF4B => {
+                self.ppu.write(address, value, &mut self.interrupts)
             }
             0xFF4F => self.vram.write_bank_register(value),
             0xFF70 => self.wram.write_bank_register(value),

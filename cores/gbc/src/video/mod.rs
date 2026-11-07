@@ -6,7 +6,9 @@
 //! CPU access restrictions during PPU mode 2/3 and DMA are not modeled yet.
 
 mod oam;
+mod ppu;
 mod vram;
 
 pub(crate) use oam::ObjectRam;
+pub(crate) use ppu::Ppu;
 pub(crate) use vram::VideoRam;
