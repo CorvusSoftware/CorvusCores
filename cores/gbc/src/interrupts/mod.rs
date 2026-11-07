@@ -3,8 +3,9 @@
 
 //! Interrupt request (IF) and enable (IE) registers.
 //!
-//! IME, interrupt acknowledge timing, and CPU vector dispatch are not yet
-//! implemented. A pending request is not the same as a serviced interrupt.
+//! The CPU owns IME and interrupt vector dispatch at instruction boundaries.
+//! Per-M-cycle interrupt acknowledge timing is not yet simulated. A pending
+//! request is not the same as a serviced interrupt.
 
 #[cfg(test)]
 mod tests;
