@@ -67,10 +67,7 @@ fn dma_restart_switches_sources_and_replaces_all_oam_bytes() {
     bus.tick_t_cycles(4 * 159);
     assert!(!bus.oam_dma_active());
     for index in 0_u16..160 {
-        assert_eq!(
-            bus.read(0xFE00 + index),
-            Some(0x80 | (index as u8 & 0x7F))
-        );
+        assert_eq!(bus.read(0xFE00 + index), Some(0x80 | (index as u8 & 0x7F)));
     }
     assert_eq!(bus.read(0xFF46), Some(0xD0));
 }
