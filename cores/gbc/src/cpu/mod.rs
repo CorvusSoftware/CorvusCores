@@ -13,6 +13,10 @@ mod alu_tests;
 mod cb;
 mod error;
 mod execute;
+mod load;
+
+#[cfg(test)]
+mod load_tests;
 mod registers;
 mod stack;
 
