@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 CorvusSoftware
+# SPDX-License-Identifier: AGPL-3.0-only
+
 [workspace]
 members = ["cores/gbc"]
 resolver = "2"
