@@ -3,9 +3,9 @@
 
 //! Cartridge header decoding and mapper implementations.
 
-mod mapper;
 mod error;
 mod header;
+mod mapper;
 mod mbc1;
 #[cfg(test)]
 mod mbc1_tests;
@@ -14,8 +14,8 @@ mod rom_only;
 #[cfg(test)]
 mod tests;
 
-pub use mapper::Cartridge;
 pub use error::CartridgeError;
 pub use header::{CartridgeHeader, CgbSupport};
+pub use mapper::Cartridge;
 pub use mbc1::Mbc1Cartridge;
 pub use rom_only::RomOnlyCartridge;
