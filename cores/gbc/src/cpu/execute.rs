@@ -74,19 +74,26 @@ impl Cpu {
 
     fn increment8(&mut self, value: u8) -> u8 {
         let result = value.wrapping_add(1);
-        let flags = (self.registers.flags() & FLAG_CARRY)
-            | if result == 0 { FLAG_ZERO } else { 0 }
-            | if value & 0x0F == 0x0F { FLAG_HALF_CARRY } else { 0 };
+        let mut flags = self.registers.flags() & FLAG_CARRY;
+        if result == 0 {
+            flags |= FLAG_ZERO;
+        }
+        if value & 0x0F == 0x0F {
+            flags |= FLAG_HALF_CARRY;
+        }
         self.registers.set_flags(flags);
         result
     }
 
     fn decrement8(&mut self, value: u8) -> u8 {
         let result = value.wrapping_sub(1);
-        let flags = (self.registers.flags() & FLAG_CARRY)
-            | FLAG_SUBTRACT
-            | if result == 0 { FLAG_ZERO } else { 0 }
-            | if value & 0x0F == 0 { FLAG_HALF_CARRY } else { 0 };
+        let mut flags = (self.registers.flags() & FLAG_CARRY) | FLAG_SUBTRACT;
+        if result == 0 {
+            flags |= FLAG_ZERO;
+        }
+        if value & 0x0F == 0 {
+            flags |= FLAG_HALF_CARRY;
+        }
         self.registers.set_flags(flags);
         result
     }
@@ -95,15 +102,17 @@ impl Cpu {
         let a = self.registers.a;
         let (result, carry) = a.overflowing_add(value);
         self.registers.a = result;
-        self.registers.set_flags(
-            if result == 0 { FLAG_ZERO } else { 0 }
-                | if (a & 0x0F) + (value & 0x0F) > 0x0F {
-                    FLAG_HALF_CARRY
-                } else {
-                    0
-                }
-                | if carry { FLAG_CARRY } else { 0 },
-        );
+        let mut flags = 0;
+        if result == 0 {
+            flags |= FLAG_ZERO;
+        }
+        if (a & 0x0F) + (value & 0x0F) > 0x0F {
+            flags |= FLAG_HALF_CARRY;
+        }
+        if carry {
+            flags |= FLAG_CARRY;
+        }
+        self.registers.set_flags(flags);
     }
 
     fn sub_a(&mut self, value: u8, store: bool) {
@@ -112,16 +121,17 @@ impl Cpu {
         if store {
             self.registers.a = result;
         }
-        self.registers.set_flags(
-            FLAG_SUBTRACT
-                | if result == 0 { FLAG_ZERO } else { 0 }
-                | if a & 0x0F < value & 0x0F {
-                    FLAG_HALF_CARRY
-                } else {
-                    0
-                }
-                | if a < value { FLAG_CARRY } else { 0 },
-        );
+        let mut flags = FLAG_SUBTRACT;
+        if result == 0 {
+            flags |= FLAG_ZERO;
+        }
+        if (a & 0x0F) < (value & 0x0F) {
+            flags |= FLAG_HALF_CARRY;
+        }
+        if a < value {
+            flags |= FLAG_CARRY;
+        }
+        self.registers.set_flags(flags);
     }
 
     /// Executes one supported opcode and returns its nominal number of T-cycles.
@@ -242,7 +252,8 @@ impl Cpu {
                 }
             }
             0xC3 => {
-                self.registers.pc = self.fetch16(bus)?;
+                let address = self.fetch16(bus)?;
+                self.registers.pc = address;
                 16
             }
             0xC2 | 0xCA | 0xD2 | 0xDA => {
