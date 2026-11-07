@@ -4,9 +4,7 @@
 //! ALU regression tests with self-authored instruction streams and BCD inputs.
 
 use super::tests::fixture;
-use super::{
-    Cpu, CpuError, FLAG_CARRY, FLAG_HALF_CARRY, FLAG_SUBTRACT, FLAG_ZERO,
-};
+use super::{Cpu, CpuError, FLAG_CARRY, FLAG_HALF_CARRY, FLAG_SUBTRACT, FLAG_ZERO};
 
 fn reference_alu(family: u8, a: u8, value: u8, carry: bool) -> (u8, u8) {
     match family {
@@ -38,7 +36,10 @@ fn reference_alu(family: u8, a: u8, value: u8, carry: bool) -> (u8, u8) {
         }
         4 => {
             let result = a & value;
-            (result, FLAG_HALF_CARRY | if result == 0 { FLAG_ZERO } else { 0 })
+            (
+                result,
+                FLAG_HALF_CARRY | if result == 0 { FLAG_ZERO } else { 0 },
+            )
         }
         5 => {
             let result = a ^ value;
@@ -61,7 +62,9 @@ fn adc_and_sbc_match_all_8bit_operands_with_and_without_carry() {
                     let mut cpu = Cpu::new();
                     cpu.registers.a = a as u8;
                     cpu.registers.set_flags(
-                        FLAG_ZERO | FLAG_SUBTRACT | FLAG_HALF_CARRY
+                        FLAG_ZERO
+                            | FLAG_SUBTRACT
+                            | FLAG_HALF_CARRY
                             | if carry { FLAG_CARRY } else { 0 },
                     );
                     cpu.alu_a(family, value as u8);
@@ -89,7 +92,8 @@ fn all_64_register_alu_opcodes_decode_and_use_correct_cycles() {
             cpu.registers.d = 0x0F;
             cpu.registers.e = 0xFF;
             cpu.registers.set_hl(0xC123);
-            cpu.registers.set_flags(FLAG_CARRY | FLAG_ZERO | FLAG_SUBTRACT);
+            cpu.registers
+                .set_flags(FLAG_CARRY | FLAG_ZERO | FLAG_SUBTRACT);
             assert!(bus.write(0xC123, 0x23));
 
             let value = match source {
@@ -170,7 +174,8 @@ fn daa_opcode_and_flag_control_instructions_preserve_required_bits() {
     // DAA; CPL; SCF; CCF; CCF
     let (mut cpu, mut bus) = fixture(&[0x27, 0x2F, 0x37, 0x3F, 0x3F]);
     cpu.registers.a = 0x10;
-    cpu.registers.set_flags(FLAG_SUBTRACT | FLAG_HALF_CARRY | FLAG_CARRY);
+    cpu.registers
+        .set_flags(FLAG_SUBTRACT | FLAG_HALF_CARRY | FLAG_CARRY);
     assert_eq!(cpu.step(&mut bus), Ok(4));
     assert_eq!(cpu.registers.a, 0xAA);
     assert_eq!(cpu.registers.flags(), FLAG_SUBTRACT | FLAG_CARRY);
@@ -213,7 +218,13 @@ fn accumulator_rotations_clear_zero_and_use_old_carry_correctly() {
 fn add_hl_16bit_sets_half_carry_from_bit_11_and_preserves_zero() {
     let cases = [
         (0x09, 0x0FFF, 0x0001, 0x1000, FLAG_ZERO | FLAG_HALF_CARRY),
-        (0x19, 0xFFFF, 0x0001, 0x0000, FLAG_ZERO | FLAG_HALF_CARRY | FLAG_CARRY),
+        (
+            0x19,
+            0xFFFF,
+            0x0001,
+            0x0000,
+            FLAG_ZERO | FLAG_HALF_CARRY | FLAG_CARRY,
+        ),
         (0x29, 0x8000, 0x8000, 0x0000, FLAG_ZERO | FLAG_CARRY),
         (0x39, 0x0FFF, 0xF000, 0xFFFF, FLAG_ZERO),
     ];
@@ -223,7 +234,8 @@ fn add_hl_16bit_sets_half_carry_from_bit_11_and_preserves_zero() {
         cpu.registers.set_bc(operand);
         cpu.registers.set_de(operand);
         cpu.registers.sp = operand;
-        cpu.registers.set_flags(FLAG_ZERO | FLAG_SUBTRACT | FLAG_HALF_CARRY | FLAG_CARRY);
+        cpu.registers
+            .set_flags(FLAG_ZERO | FLAG_SUBTRACT | FLAG_HALF_CARRY | FLAG_CARRY);
         assert_eq!(cpu.step(&mut bus), Ok(8));
         assert_eq!(cpu.registers.hl(), expected, "opcode {opcode:02X}");
         assert_eq!(cpu.registers.flags(), expected_flags, "opcode {opcode:02X}");
