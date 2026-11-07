@@ -6,7 +6,7 @@
 //! The bus is not cycle-accurate yet; the returned count is instruction
 //! timing only, not proof that the surrounding machine has advanced.
 
-use super::{Cpu, CpuError, FLAG_CARRY, FLAG_ZERO};
+use super::{Cpu, CpuError};
 use crate::bus::Bus;
 
 impl Cpu {
@@ -67,19 +67,6 @@ impl Cpu {
         Ok(())
     }
 
-    fn check_condition(&self, opcode: u8) -> bool {
-        let flags = self.registers.flags();
-        // NZ, Z, NC, C share the same two-bit condition field in
-        // JR cc, JP cc, CALL cc and RET cc opcodes.
-        match (opcode >> 3) & 0x03 {
-            0 => flags & FLAG_ZERO == 0,
-            1 => flags & FLAG_ZERO != 0,
-            2 => flags & FLAG_CARRY == 0,
-            3 => flags & FLAG_CARRY != 0,
-            _ => unreachable!("condition field is two bits"),
-        }
-    }
-
     /// Execute one supported instruction, interrupt entry, or HALT idle step.
     ///
     /// Returns nominal T-cycles, without advancing bus peripherals. On
@@ -122,6 +109,11 @@ impl Cpu {
             0xCB => {
                 let cb_opcode = self.fetch8(bus)?;
                 self.execute_cb(cb_opcode, bus)?
+            }
+            0x18 | 0x20 | 0x28 | 0x30 | 0x38 | 0xC0 | 0xC2 | 0xC3 | 0xC4 | 0xC7 | 0xC8
+            | 0xC9 | 0xCA | 0xCC | 0xCD | 0xCF | 0xD0 | 0xD2 | 0xD4 | 0xD7 | 0xD8
+            | 0xDA | 0xDC | 0xDF | 0xE7 | 0xE9 | 0xEF | 0xF7 | 0xFF => {
+                self.execute_control_flow(opcode, bus)?
             }
             0x02 | 0x12 | 0x0A | 0x1A | 0x22 | 0x32 | 0x2A | 0x3A | 0xE0 | 0xF0 | 0xE2 | 0xF2
             | 0xEA | 0xFA => self.execute_transfer(opcode, bus)?,
@@ -225,26 +217,6 @@ impl Cpu {
                 self.alu_a((opcode >> 3) & 0x07, value);
                 8
             }
-            0x18 => {
-                let displacement = self.fetch8(bus)? as i8;
-                self.registers.pc = self
-                    .registers
-                    .pc
-                    .wrapping_add(i16::from(displacement) as u16);
-                12
-            }
-            0x20 | 0x28 | 0x30 | 0x38 => {
-                let displacement = self.fetch8(bus)? as i8;
-                if self.check_condition(opcode) {
-                    self.registers.pc = self
-                        .registers
-                        .pc
-                        .wrapping_add(i16::from(displacement) as u16);
-                    12
-                } else {
-                    8
-                }
-            }
             0xE8 | 0xF8 => {
                 let displacement = self.fetch8(bus)? as i8;
                 let result = self.sp_plus_signed(displacement);
@@ -280,61 +252,9 @@ impl Cpu {
                 self.push16(bus, value)?;
                 16
             }
-            0xC9 => {
-                self.registers.pc = self.pop16(bus)?;
-                16
-            }
-            0xC0 | 0xC8 | 0xD0 | 0xD8 => {
-                if self.check_condition(opcode) {
-                    self.registers.pc = self.pop16(bus)?;
-                    20
-                } else {
-                    8
-                }
-            }
-            0xCD => {
-                let address = self.fetch16(bus)?;
-                self.push16(bus, self.registers.pc)?;
-                self.registers.pc = address;
-                24
-            }
-            0xC4 | 0xCC | 0xD4 | 0xDC => {
-                let address = self.fetch16(bus)?;
-                if self.check_condition(opcode) {
-                    self.push16(bus, self.registers.pc)?;
-                    self.registers.pc = address;
-                    24
-                } else {
-                    12
-                }
-            }
-            0xE9 => {
-                self.registers.pc = self.registers.hl();
-                4
-            }
             0xF9 => {
                 self.registers.sp = self.registers.hl();
                 8
-            }
-            op if op & 0xC7 == 0xC7 => {
-                let vector = u16::from(opcode & 0x38);
-                self.push16(bus, self.registers.pc)?;
-                self.registers.pc = vector;
-                16
-            }
-            0xC3 => {
-                let address = self.fetch16(bus)?;
-                self.registers.pc = address;
-                16
-            }
-            0xC2 | 0xCA | 0xD2 | 0xDA => {
-                let address = self.fetch16(bus)?;
-                if self.check_condition(opcode) {
-                    self.registers.pc = address;
-                    16
-                } else {
-                    12
-                }
             }
             _ => {
                 self.registers.pc = opcode_address;
