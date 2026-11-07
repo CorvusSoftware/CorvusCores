@@ -17,6 +17,8 @@ use crate::timer::Timer;
 use crate::video::{ObjectRam, Ppu, VideoRam};
 
 #[cfg(test)]
+mod dma_tests;
+#[cfg(test)]
 mod timing_tests;
 
 /// Mode selected from the cartridge's header at this early stage.
