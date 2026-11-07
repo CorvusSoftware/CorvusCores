@@ -60,16 +60,10 @@ fn addition_and_subtraction_set_half_carry_and_carry() {
     assert_eq!(cpu.step(&mut bus), Ok(8));
     assert_eq!(cpu.step(&mut bus), Ok(8));
     assert_eq!(cpu.registers.a, 0);
-    assert_eq!(
-        cpu.registers.flags(),
-        FLAG_ZERO | FLAG_HALF_CARRY | FLAG_CARRY
-    );
+    assert_eq!(cpu.registers.flags(), FLAG_ZERO | FLAG_HALF_CARRY | FLAG_CARRY);
     assert_eq!(cpu.step(&mut bus), Ok(8));
     assert_eq!(cpu.registers.a, 0xFF);
-    assert_eq!(
-        cpu.registers.flags(),
-        FLAG_SUBTRACT | FLAG_HALF_CARRY | FLAG_CARRY
-    );
+    assert_eq!(cpu.registers.flags(), FLAG_SUBTRACT | FLAG_HALF_CARRY | FLAG_CARRY);
 }
 
 #[test]
@@ -82,10 +76,7 @@ fn inc_and_dec_preserve_the_carry_flag() {
     assert_eq!(cpu.registers.flags(), FLAG_HALF_CARRY | FLAG_CARRY);
     assert_eq!(cpu.step(&mut bus), Ok(4));
     assert_eq!(cpu.registers.a, 0x0F);
-    assert_eq!(
-        cpu.registers.flags(),
-        FLAG_SUBTRACT | FLAG_HALF_CARRY | FLAG_CARRY
-    );
+    assert_eq!(cpu.registers.flags(), FLAG_SUBTRACT | FLAG_HALF_CARRY | FLAG_CARRY);
 }
 
 #[test]
@@ -162,10 +153,7 @@ fn absolute_memory_load_and_store_use_little_endian_addresses() {
 fn returns_explicit_error_instead_of_faking_unimplemented_hardware() {
     let (mut cpu, mut bus) = fixture(&[0x21, 0x00, 0xFF, 0x7E]);
     assert_eq!(cpu.step(&mut bus), Ok(12));
-    assert_eq!(
-        cpu.step(&mut bus),
-        Err(CpuError::UnmappedRead { address: 0xFF00 })
-    );
+    assert_eq!(cpu.step(&mut bus), Err(CpuError::UnmappedRead { address: 0xFF00 }));
 }
 
 #[test]
