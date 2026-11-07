@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 CorvusSoftware
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Work RAM and its CGB bank register.
 //!
 //! C000–CFFF always maps bank 0. D000–DFFF maps bank 1 in non-CGB
