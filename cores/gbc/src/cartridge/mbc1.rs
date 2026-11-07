@@ -21,6 +21,7 @@ pub struct Mbc1Cartridge {
     ram: Box<[u8]>,
     header: CartridgeHeader,
     rom_bank_mask: usize,
+    ram_bank_mask: usize,
     ram_enabled: bool,
     low_rom_bank: u8,
     upper_bank: u8,
@@ -62,6 +63,7 @@ impl Mbc1Cartridge {
             ram: vec![0; ram_bytes].into_boxed_slice(),
             header,
             rom_bank_mask: rom_banks - 1,
+            ram_bank_mask: (ram_bytes / RAM_BANK_SIZE).saturating_sub(1),
             ram_enabled: false,
             low_rom_bank: 1,
             upper_bank: 0,
@@ -116,7 +118,7 @@ impl Mbc1Cartridge {
             return None;
         }
         let bank = if self.advanced_mode {
-            usize::from(self.upper_bank)
+            usize::from(self.upper_bank) & self.ram_bank_mask
         } else {
             0
         };
