@@ -8,7 +8,8 @@
 //! runner clocks peripherals at instruction boundaries, not per bus access.
 //! Initial background, window and sprite scanline rendering is available;
 //! boot, full pixel timing and CorvusSoftware API integration are absent.
-//! OAM DMA and CPU video-memory gating are preliminary instruction-boundary models.
+//! OAM and CGB VRAM DMA plus CPU video-memory gating remain preliminary
+//! instruction-boundary models rather than a complete hardware bus.
 
 pub mod bus;
 pub mod cartridge;
