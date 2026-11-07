@@ -16,10 +16,7 @@ fn transfer_outputs_160_pairs_over_exactly_640_t_cycles() {
             assert_eq!(dma.tick_t_cycle(), None);
             assert!(dma.active());
         }
-        assert_eq!(
-            dma.tick_t_cycle(),
-            Some((0xC100 + index, 0xFE00 + index))
-        );
+        assert_eq!(dma.tick_t_cycle(), Some((0xC100 + index, 0xFE00 + index)));
     }
     assert!(!dma.active());
     for _ in 0..128 {
