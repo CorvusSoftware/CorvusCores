@@ -47,10 +47,8 @@ impl Cpu {
             3 => self.sub_from_a(value, true, true),
             4 => {
                 self.registers.a &= value;
-                self.registers.set_flags(
-                    FLAG_HALF_CARRY
-                        | if self.registers.a == 0 { FLAG_ZERO } else { 0 },
-                );
+                self.registers
+                    .set_flags(FLAG_HALF_CARRY | if self.registers.a == 0 { FLAG_ZERO } else { 0 });
             }
             5 => {
                 self.registers.a ^= value;
