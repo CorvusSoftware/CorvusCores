@@ -6,9 +6,7 @@
 //! The bus is not cycle-accurate yet; the returned count is instruction
 //! timing only, not proof that the surrounding machine has advanced.
 
-use super::{
-    Cpu, CpuError, FLAG_CARRY, FLAG_HALF_CARRY, FLAG_SUBTRACT, FLAG_ZERO,
-};
+use super::{Cpu, CpuError, FLAG_CARRY, FLAG_ZERO};
 use crate::bus::Bus;
 
 impl Cpu {
@@ -70,68 +68,6 @@ impl Cpu {
             0x38 | 0xDA => flags & FLAG_CARRY != 0,
             _ => unreachable!("not a conditional jump opcode"),
         }
-    }
-
-    fn increment8(&mut self, value: u8) -> u8 {
-        let result = value.wrapping_add(1);
-        let mut flags = self.registers.flags() & FLAG_CARRY;
-        if result == 0 {
-            flags |= FLAG_ZERO;
-        }
-        if value & 0x0F == 0x0F {
-            flags |= FLAG_HALF_CARRY;
-        }
-        self.registers.set_flags(flags);
-        result
-    }
-
-    fn decrement8(&mut self, value: u8) -> u8 {
-        let result = value.wrapping_sub(1);
-        let mut flags = (self.registers.flags() & FLAG_CARRY) | FLAG_SUBTRACT;
-        if result == 0 {
-            flags |= FLAG_ZERO;
-        }
-        if value & 0x0F == 0 {
-            flags |= FLAG_HALF_CARRY;
-        }
-        self.registers.set_flags(flags);
-        result
-    }
-
-    fn add_a(&mut self, value: u8) {
-        let a = self.registers.a;
-        let (result, carry) = a.overflowing_add(value);
-        self.registers.a = result;
-        let mut flags = 0;
-        if result == 0 {
-            flags |= FLAG_ZERO;
-        }
-        if (a & 0x0F) + (value & 0x0F) > 0x0F {
-            flags |= FLAG_HALF_CARRY;
-        }
-        if carry {
-            flags |= FLAG_CARRY;
-        }
-        self.registers.set_flags(flags);
-    }
-
-    fn sub_a(&mut self, value: u8, store: bool) {
-        let a = self.registers.a;
-        let result = a.wrapping_sub(value);
-        if store {
-            self.registers.a = result;
-        }
-        let mut flags = FLAG_SUBTRACT;
-        if result == 0 {
-            flags |= FLAG_ZERO;
-        }
-        if (a & 0x0F) < (value & 0x0F) {
-            flags |= FLAG_HALF_CARRY;
-        }
-        if a < value {
-            flags |= FLAG_CARRY;
-        }
-        self.registers.set_flags(flags);
     }
 
     /// Executes one supported opcode and returns its nominal number of T-cycles.
