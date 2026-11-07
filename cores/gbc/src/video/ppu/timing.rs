@@ -26,11 +26,7 @@ impl Ppu {
             self.dot += 1;
             if self.dot == DOTS_PER_LINE {
                 self.dot = 0;
-                self.ly = if self.ly == LAST_LINE {
-                    0
-                } else {
-                    self.ly + 1
-                };
+                self.ly = if self.ly == LAST_LINE { 0 } else { self.ly + 1 };
 
                 if self.ly == FIRST_VBLANK_LINE {
                     self.mode = Mode::VBlank;
