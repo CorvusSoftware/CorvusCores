@@ -4,8 +4,8 @@
 //! Instruction-boundary orchestration for the incomplete GBC emulator.
 //!
 //! CPU instructions, HALT idle steps and interrupt entry return nominal
-//! CPU T-cycles. This runner advances the timer, OAM DMA and nominal LCD PPU
-//! by that count *after* the entire CPU step. It does not interleave memory
+//! CPU T-cycles. The runner advances timer, OAM/VRAM DMA and the nominal
+//! LCD PPU after each CPU step. GDMA and active HDMA blocks hold CPU fetches. It does not interleave memory
 //! accesses with peripherals and is not a cycle-accurate scheduler or
 //! the CorvusSoftware frontend API.
 
@@ -52,12 +52,13 @@ impl Machine {
         &mut self.bus
     }
 
-    /// CPU T-cycles from successful calls to Machine::step only.
+    /// Elapsed normal-speed T-cycles from instructions and DMA stall steps.
     pub fn elapsed_t_cycles(&self) -> u64 {
         self.elapsed_t_cycles
     }
 
-    /// Execute one CPU step, then advance timers, DMA, LCD modes and IRQs.
+    /// Execute one CPU step or spend four T-cycles stalled by VRAM DMA,
+    /// then advance timers, DMA, LCD modes and IRQs.
     ///
     /// The next step observes any interrupt generated in this step. If
     /// execution fails, no time is advanced or accounted, although existing
@@ -67,7 +68,14 @@ impl Machine {
     /// registers take effect before the step's T-cycles are advanced, not
     /// at their real per-M-cycle location.
     pub fn step(&mut self) -> Result<u8, CpuError> {
-        let cycles = self.cpu.step(&mut self.bus)?;
+        // A GDMA transfer, or the current HDMA block, suspends CPU fetches.
+        // The bus continues clocking the DMA, PPU and DIV/TIMA. Four cycles
+        // is a host-runner scheduling quantum, not a CPU instruction.
+        let cycles = if self.bus.vram_dma_cpu_stalled() {
+            4
+        } else {
+            self.cpu.step(&mut self.bus)?
+        };
         self.bus.tick_t_cycles(u32::from(cycles));
         self.elapsed_t_cycles += u64::from(cycles);
         Ok(cycles)
