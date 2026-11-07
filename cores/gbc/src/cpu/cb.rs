@@ -24,10 +24,10 @@ impl Cpu {
                     1 => (value.rotate_right(1), value & 0x01 != 0), // RRC
                     2 => ((value << 1) | u8::from(old_carry), value & 0x80 != 0), // RL
                     3 => ((value >> 1) | (u8::from(old_carry) << 7), value & 1 != 0), // RR
-                    4 => (value << 1, value & 0x80 != 0), // SLA
+                    4 => (value << 1, value & 0x80 != 0),           // SLA
                     5 => ((value >> 1) | (value & 0x80), value & 1 != 0), // SRA
-                    6 => (value.rotate_left(4), false), // SWAP
-                    7 => (value >> 1, value & 1 != 0), // SRL
+                    6 => (value.rotate_left(4), false),             // SWAP
+                    7 => (value >> 1, value & 1 != 0),              // SRL
                     _ => unreachable!("three-bit operation field"),
                 };
                 self.write_r8(target, result, bus)?;
@@ -50,7 +50,7 @@ impl Cpu {
                 self.registers.set_flags(flags);
             }
             2 => self.write_r8(target, value & !(1 << bit), bus)?, // RES
-            3 => self.write_r8(target, value | (1 << bit), bus)?, // SET
+            3 => self.write_r8(target, value | (1 << bit), bus)?,  // SET
             _ => unreachable!("two-bit opcode group"),
         }
 
