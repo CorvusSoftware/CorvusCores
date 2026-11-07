@@ -6,8 +6,8 @@
 //! Cartridge parsing, memory, partial SM83 execution, timers, interrupts
 //! and nominal LCD mode timing have initial implementations. The machine
 //! runner clocks peripherals at instruction boundaries, not per bus access.
-//! Initial background rendering is available; window, sprites, boot and
-//! CorvusSoftware API integration are absent.
+//! Initial background, window and sprite scanline rendering is available;
+//! boot, full pixel timing and CorvusSoftware API integration are absent.
 
 pub mod bus;
 pub mod cartridge;
