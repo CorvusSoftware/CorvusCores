@@ -22,13 +22,7 @@ pub(super) struct BgPixel {
 }
 
 impl Ppu {
-    pub(super) fn sample_bg_pixel(
-        &self,
-        vram: &VideoRam,
-        map_base: u16,
-        x: u8,
-        y: u8,
-    ) -> BgPixel {
+    pub(super) fn sample_bg_pixel(&self, vram: &VideoRam, map_base: u16, x: u8, y: u8) -> BgPixel {
         let map_address = map_base + u16::from(y / 8) * 32 + u16::from(x / 8);
         let tile = vram
             .read_bank(map_address, 0)
@@ -40,8 +34,16 @@ impl Ppu {
             0
         };
         let bank = (attributes >> 3) & 1;
-        let tile_x = if attributes & 0x20 != 0 { 7 - (x & 7) } else { x & 7 };
-        let tile_y = if attributes & 0x40 != 0 { 7 - (y & 7) } else { y & 7 };
+        let tile_x = if attributes & 0x20 != 0 {
+            7 - (x & 7)
+        } else {
+            x & 7
+        };
+        let tile_y = if attributes & 0x40 != 0 {
+            7 - (y & 7)
+        } else {
+            y & 7
+        };
 
         let tile_base = if self.lcdc & 0x10 != 0 {
             0x8000 + u16::from(tile) * 16
@@ -79,7 +81,11 @@ impl Ppu {
             return;
         }
 
-        let map_base = if self.lcdc & 0x08 != 0 { 0x9C00 } else { 0x9800 };
+        let map_base = if self.lcdc & 0x08 != 0 {
+            0x9C00
+        } else {
+            0x9800
+        };
         let y = self.scy.wrapping_add(self.ly);
         for screen_x in 0..SCREEN_WIDTH {
             let x = self.scx.wrapping_add(screen_x as u8);
