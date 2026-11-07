@@ -11,6 +11,7 @@ mod alu;
 #[cfg(test)]
 mod alu_tests;
 mod cb;
+mod control_flow;
 mod error;
 mod execute;
 mod interrupts;
@@ -28,6 +29,8 @@ mod stack_tests;
 
 #[cfg(test)]
 mod cb_tests;
+#[cfg(test)]
+mod control_flow_tests;
 #[cfg(test)]
 mod tests;
 
