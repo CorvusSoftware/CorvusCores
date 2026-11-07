@@ -15,9 +15,9 @@ use crate::memory::{HighRam, WorkRam};
 use crate::timer::Timer;
 use crate::video::{ObjectRam, Ppu, VideoRam};
 
-mod clock;
 #[cfg(test)]
 mod cartridge_tests;
+mod clock;
 mod cpu_access;
 #[cfg(test)]
 mod dma_tests;
