@@ -4,8 +4,8 @@
 //! Partial 16-bit address bus for the Game Boy Color.
 //!
 //! This is an untimed memory-routing foundation, NOT the final CPU-visible bus.
-//! Unimplemented I/O, CPU interrupt dispatch, boot ROM mapping, DMA and PPU
-//! access restrictions are deliberately not faked. An absent read returns `None`,
+//! Unimplemented I/O, precisely timed CPU interrupt service, boot ROM
+//! mapping, DMA and PPU access restrictions are deliberately not faked. An absent read returns `None`,
 //! and an unsupported write returns `false`.
 
 use crate::cartridge::{CgbSupport, RomOnlyCartridge};
@@ -74,7 +74,8 @@ impl Bus {
         self.interrupts.highest_pending()
     }
 
-    /// Acknowledge only; CPU IME/stack/vector dispatch is not implemented.
+    /// Clear a requested interrupt flag; CPU IME/stack/vector handling is
+    /// performed separately by the CPU.
     pub fn acknowledge_interrupt(&mut self, interrupt: Interrupt) {
         self.interrupts.acknowledge(interrupt);
     }
