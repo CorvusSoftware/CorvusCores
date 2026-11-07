@@ -65,12 +65,14 @@ impl Cpu {
 
     fn check_condition(&self, opcode: u8) -> bool {
         let flags = self.registers.flags();
-        match opcode {
-            0x20 | 0xC2 => flags & FLAG_ZERO == 0,
-            0x28 | 0xCA => flags & FLAG_ZERO != 0,
-            0x30 | 0xD2 => flags & FLAG_CARRY == 0,
-            0x38 | 0xDA => flags & FLAG_CARRY != 0,
-            _ => unreachable!("not a conditional jump opcode"),
+        // NZ, Z, NC, C share the same two-bit condition field in
+        // JR cc, JP cc, CALL cc and RET cc opcodes.
+        match (opcode >> 3) & 0x03 {
+            0 => flags & FLAG_ZERO == 0,
+            1 => flags & FLAG_ZERO != 0,
+            2 => flags & FLAG_CARRY == 0,
+            3 => flags & FLAG_CARRY != 0,
+            _ => unreachable!("condition field is two bits"),
         }
     }
 
@@ -232,6 +234,72 @@ impl Cpu {
                 } else {
                     8
                 }
+            }
+            0x08 => {
+                let address = self.fetch16(bus)?;
+                let [low, high] = self.registers.sp.to_le_bytes();
+                if !bus.write(address, low) {
+                    return Err(CpuError::UnmappedWrite { address });
+                }
+                let next = address.wrapping_add(1);
+                if !bus.write(next, high) {
+                    return Err(CpuError::UnmappedWrite { address: next });
+                }
+                20
+            }
+            0xC1 | 0xD1 | 0xE1 | 0xF1 => {
+                let pair = (opcode >> 4) & 0x03;
+                let value = self.pop16(bus)?;
+                self.set_stack_pair(pair, value);
+                12
+            }
+            0xC5 | 0xD5 | 0xE5 | 0xF5 => {
+                let pair = (opcode >> 4) & 0x03;
+                let value = self.stack_pair(pair);
+                self.push16(bus, value)?;
+                16
+            }
+            0xC9 => {
+                self.registers.pc = self.pop16(bus)?;
+                16
+            }
+            0xC0 | 0xC8 | 0xD0 | 0xD8 => {
+                if self.check_condition(opcode) {
+                    self.registers.pc = self.pop16(bus)?;
+                    20
+                } else {
+                    8
+                }
+            }
+            0xCD => {
+                let address = self.fetch16(bus)?;
+                self.push16(bus, self.registers.pc)?;
+                self.registers.pc = address;
+                24
+            }
+            0xC4 | 0xCC | 0xD4 | 0xDC => {
+                let address = self.fetch16(bus)?;
+                if self.check_condition(opcode) {
+                    self.push16(bus, self.registers.pc)?;
+                    self.registers.pc = address;
+                    24
+                } else {
+                    12
+                }
+            }
+            0xE9 => {
+                self.registers.pc = self.registers.hl();
+                4
+            }
+            0xF9 => {
+                self.registers.sp = self.registers.hl();
+                8
+            }
+            op if op & 0xC7 == 0xC7 => {
+                let vector = u16::from(opcode & 0x38);
+                self.push16(bus, self.registers.pc)?;
+                self.registers.pc = vector;
+                16
             }
             0xC3 => {
                 let address = self.fetch16(bus)?;
