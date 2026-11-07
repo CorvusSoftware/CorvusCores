@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! Video-owned memory, independent of the PPU's timing and rendering.
+//! Video-owned VRAM, OAM and the nominal PPU background renderer.
 //!
-//! CPU access restrictions during PPU mode 2/3 and DMA are not modeled yet.
+//! CPU VRAM/OAM access restrictions during PPU modes and DMA are not modeled.
 
 mod oam;
 mod ppu;

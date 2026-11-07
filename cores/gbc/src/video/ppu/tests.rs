@@ -5,9 +5,15 @@
 
 use super::Ppu;
 use crate::interrupts::{Interrupt, InterruptController};
+use crate::video::VideoRam;
 
 fn write(ppu: &mut Ppu, irq: &mut InterruptController, address: u16, value: u8) {
     assert!(ppu.write(address, value, irq));
+}
+
+fn tick(ppu: &mut Ppu, dots: u32, irq: &mut InterruptController) {
+    let vram = VideoRam::new(false);
+    ppu.tick(dots, &vram, irq);
 }
 
 fn mode(ppu: &Ppu) -> u8 {
@@ -16,12 +22,12 @@ fn mode(ppu: &Ppu) -> u8 {
 
 #[test]
 fn lcd_starts_off_without_clocking_or_requests() {
-    let mut ppu = Ppu::new();
+    let mut ppu = Ppu::new(false);
     let mut irq = InterruptController::new();
     assert_eq!(ppu.read(0xFF40), Some(0));
     assert_eq!(ppu.read(0xFF41), Some(0x84));
     assert_eq!(ppu.read(0xFF44), Some(0));
-    ppu.tick(456 * 154 * 2, &mut irq);
+    tick(&mut ppu, 456 * 154 * 2, &mut irq);
     assert_eq!(ppu.read(0xFF44), Some(0));
     assert_eq!(mode(&ppu), 0);
     assert_eq!(irq.read_if(), 0xE0);
@@ -29,23 +35,23 @@ fn lcd_starts_off_without_clocking_or_requests() {
 
 #[test]
 fn visible_line_uses_80_oam_172_transfer_204_hblank_dots() {
-    let mut ppu = Ppu::new();
+    let mut ppu = Ppu::new(false);
     let mut irq = InterruptController::new();
     write(&mut ppu, &mut irq, 0xFF40, 0x80);
     assert_eq!(mode(&ppu), 2);
     assert_eq!(ppu.read(0xFF44), Some(0));
 
-    ppu.tick(79, &mut irq);
+    tick(&mut ppu, 79, &mut irq);
     assert_eq!(mode(&ppu), 2);
-    ppu.tick(1, &mut irq);
+    tick(&mut ppu, 1, &mut irq);
     assert_eq!(mode(&ppu), 3);
-    ppu.tick(171, &mut irq);
+    tick(&mut ppu, 171, &mut irq);
     assert_eq!(mode(&ppu), 3);
-    ppu.tick(1, &mut irq);
+    tick(&mut ppu, 1, &mut irq);
     assert_eq!(mode(&ppu), 0);
-    ppu.tick(203, &mut irq);
+    tick(&mut ppu, 203, &mut irq);
     assert_eq!(mode(&ppu), 0);
-    ppu.tick(1, &mut irq);
+    tick(&mut ppu, 1, &mut irq);
     assert_eq!(mode(&ppu), 2);
     assert_eq!(ppu.read(0xFF44), Some(1));
     assert_eq!(irq.read_if(), 0xE0);
@@ -53,69 +59,69 @@ fn visible_line_uses_80_oam_172_transfer_204_hblank_dots() {
 
 #[test]
 fn vblank_is_requested_at_line_144_and_frame_wraps_after_153() {
-    let mut ppu = Ppu::new();
+    let mut ppu = Ppu::new(false);
     let mut irq = InterruptController::new();
     write(&mut ppu, &mut irq, 0xFF40, 0x80);
 
-    ppu.tick(144 * 456 - 1, &mut irq);
+    tick(&mut ppu, 144 * 456 - 1, &mut irq);
     assert_eq!(ppu.read(0xFF44), Some(143));
     assert_eq!(mode(&ppu), 0);
     assert_eq!(irq.read_if(), 0xE0);
-    ppu.tick(1, &mut irq);
+    tick(&mut ppu, 1, &mut irq);
     assert_eq!(ppu.read(0xFF44), Some(144));
     assert_eq!(mode(&ppu), 1);
     assert_eq!(irq.read_if(), 0xE1);
 
     irq.write_if(0);
-    ppu.tick(9 * 456, &mut irq);
+    tick(&mut ppu, 9 * 456, &mut irq);
     assert_eq!(ppu.read(0xFF44), Some(153));
     assert_eq!(mode(&ppu), 1);
     assert_eq!(irq.read_if(), 0xE0);
 
-    ppu.tick(456, &mut irq);
+    tick(&mut ppu, 456, &mut irq);
     assert_eq!(ppu.read(0xFF44), Some(0));
     assert_eq!(mode(&ppu), 2);
     assert_eq!(irq.read_if(), 0xE0);
 
-    ppu.tick(144 * 456, &mut irq);
+    tick(&mut ppu, 144 * 456, &mut irq);
     assert_eq!(ppu.read(0xFF44), Some(144));
     assert_eq!(irq.read_if(), 0xE1);
 }
 
 #[test]
 fn stat_mode_sources_request_only_on_a_rising_shared_line() {
-    let mut ppu = Ppu::new();
+    let mut ppu = Ppu::new(false);
     let mut irq = InterruptController::new();
     write(&mut ppu, &mut irq, 0xFF40, 0x80);
     write(&mut ppu, &mut irq, 0xFF41, 0x28); // OAM and HBlank sources
     assert_eq!(irq.read_if(), 0xE2);
 
     irq.write_if(0);
-    ppu.tick(80, &mut irq); // mode 2 -> 3, line drops
+    tick(&mut ppu, 80, &mut irq); // mode 2 -> 3, line drops
     assert_eq!(irq.read_if(), 0xE0);
-    ppu.tick(172, &mut irq); // mode 3 -> 0, line rises
+    tick(&mut ppu, 172, &mut irq); // mode 3 -> 0, line rises
     assert_eq!(irq.read_if(), 0xE2);
 
     irq.write_if(0);
-    ppu.tick(204, &mut irq); // mode 0 -> 2: still high, no new edge
+    tick(&mut ppu, 204, &mut irq); // mode 0 -> 2: still high, no new edge
     assert_eq!(mode(&ppu), 2);
     assert_eq!(irq.read_if(), 0xE0);
-    ppu.tick(80 + 172, &mut irq); // mode 2 -> 3 -> 0: new edge
+    tick(&mut ppu, 80 + 172, &mut irq); // mode 2 -> 3 -> 0: new edge
     assert_eq!(irq.read_if(), 0xE2);
 }
 
 #[test]
 fn stat_mode_zero_and_one_sources_block_each_other_at_vblank_start() {
-    let mut ppu = Ppu::new();
+    let mut ppu = Ppu::new(false);
     let mut irq = InterruptController::new();
     write(&mut ppu, &mut irq, 0xFF41, 0x18); // mode 0 and mode 1
     write(&mut ppu, &mut irq, 0xFF40, 0x80);
-    ppu.tick(143 * 456 + 252, &mut irq);
+    tick(&mut ppu, 143 * 456 + 252, &mut irq);
     assert_eq!(mode(&ppu), 0);
     assert_eq!(irq.read_if() & Interrupt::LcdStat.mask(), 0x02);
 
     irq.write_if(0);
-    ppu.tick(204, &mut irq); // HBlank -> VBlank, shared line remains high
+    tick(&mut ppu, 204, &mut irq); // HBlank -> VBlank, shared line remains high
     assert_eq!(ppu.read(0xFF44), Some(144));
     assert_eq!(mode(&ppu), 1);
     assert_eq!(irq.read_if(), 0xE1); // VBlank yes; no STAT re-trigger
@@ -123,7 +129,7 @@ fn stat_mode_zero_and_one_sources_block_each_other_at_vblank_start() {
 
 #[test]
 fn lyc_matches_request_stat_only_on_the_coincidence_edge() {
-    let mut ppu = Ppu::new();
+    let mut ppu = Ppu::new(false);
     let mut irq = InterruptController::new();
     write(&mut ppu, &mut irq, 0xFF45, 1);
     write(&mut ppu, &mut irq, 0xFF41, 0x40);
@@ -131,24 +137,24 @@ fn lyc_matches_request_stat_only_on_the_coincidence_edge() {
     assert_eq!(ppu.read(0xFF41).unwrap() & 0x04, 0);
     assert_eq!(irq.read_if(), 0xE0);
 
-    ppu.tick(456, &mut irq);
+    tick(&mut ppu, 456, &mut irq);
     assert_eq!(ppu.read(0xFF44), Some(1));
     assert_eq!(ppu.read(0xFF41).unwrap() & 0x04, 0x04);
     assert_eq!(irq.read_if(), 0xE2);
     irq.write_if(0);
-    ppu.tick(200, &mut irq);
+    tick(&mut ppu, 200, &mut irq);
     assert_eq!(irq.read_if(), 0xE0);
 
     write(&mut ppu, &mut irq, 0xFF45, 2); // drops shared line
     assert_eq!(irq.read_if(), 0xE0);
-    ppu.tick(256, &mut irq); // LY=2: coincidence rises
+    tick(&mut ppu, 256, &mut irq); // LY=2: coincidence rises
     assert_eq!(ppu.read(0xFF44), Some(2));
     assert_eq!(irq.read_if(), 0xE2);
 }
 
 #[test]
 fn stat_writable_mask_and_read_only_ly_are_respected() {
-    let mut ppu = Ppu::new();
+    let mut ppu = Ppu::new(false);
     let mut irq = InterruptController::new();
     write(&mut ppu, &mut irq, 0xFF45, 1);
     write(&mut ppu, &mut irq, 0xFF41, 0xFF);
@@ -164,10 +170,10 @@ fn stat_writable_mask_and_read_only_ly_are_respected() {
 
 #[test]
 fn lcd_disable_resets_scanline_and_freezes_ppu_without_irq() {
-    let mut ppu = Ppu::new();
+    let mut ppu = Ppu::new(false);
     let mut irq = InterruptController::new();
     write(&mut ppu, &mut irq, 0xFF40, 0x80);
-    ppu.tick(10 * 456 + 100, &mut irq);
+    tick(&mut ppu, 10 * 456 + 100, &mut irq);
     assert_eq!(ppu.read(0xFF44), Some(10));
     assert_eq!(mode(&ppu), 3);
 
@@ -175,7 +181,7 @@ fn lcd_disable_resets_scanline_and_freezes_ppu_without_irq() {
     assert_eq!(mode(&ppu), 0);
     assert_eq!(ppu.read(0xFF44), Some(0));
     irq.write_if(0);
-    ppu.tick(100_000, &mut irq);
+    tick(&mut ppu, 100_000, &mut irq);
     assert_eq!(ppu.read(0xFF44), Some(0));
     assert_eq!(irq.read_if(), 0xE0);
 
@@ -186,7 +192,7 @@ fn lcd_disable_resets_scanline_and_freezes_ppu_without_irq() {
 
 #[test]
 fn scroll_palette_window_registers_store_values_without_rendering() {
-    let mut ppu = Ppu::new();
+    let mut ppu = Ppu::new(false);
     let mut irq = InterruptController::new();
     for (address, value) in [
         (0xFF42, 0xAB),

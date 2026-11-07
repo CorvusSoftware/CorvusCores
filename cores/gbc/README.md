@@ -50,10 +50,13 @@ src/
     ├── vram.rs         # VRAM banks, VBK register
     ├── oam.rs          # Object attribute memory
     └── ppu/
-        ├── mod.rs      # LCD state and PPU mode definitions
+        ├── mod.rs       # LCD state and row-major RGB555 framebuffer
         ├── registers.rs # LCDC/STAT/LY/LYC, scroll and palette registers
-        ├── timing.rs   # Nominal scanline, VBlank and STAT edge timing
-        └── tests.rs    # LCD mode and interrupt regression tests
+        ├── timing.rs    # Nominal scanline, VBlank and STAT edge timing
+        ├── background.rs # BG tile-map, tile-pattern and attribute sampling
+        ├── palette.rs   # CGB BGPI/BGPD (FF68/FF69) and RGB555 lookup
+        ├── render_tests.rs # DMG/CGB tile, scroll and palette pixel tests
+        └── tests.rs     # LCD mode and interrupt regression tests
 ```
 
 Components are grouped by responsibility. Future audio, DMA, and input components should receive their own modules when there is functioning code for them. Avoid concentrating unrelated hardware in `lib.rs` or the bus.
@@ -74,18 +77,20 @@ Components are grouped by responsibility. Future audio, DMA, and input component
 - The complete 256-entry **CB-prefixed** SM83 instruction space: RLC, RRC, RL, RR, SLA, SRA, SWAP, SRL, BIT, RES and SET, for registers and `(HL)` where applicable. BIT preserves carry and does not write its operand; `(HL)` variants have distinct nominal timings.
 - Explicit CPU errors for unsupported opcodes and unmapped hardware, rather than silently returning success.
 - 8 banks of WRAM in CGB mode, including `FF70` (SVBK), fixed bank 0, switchable banks 1–7, and the `E000–FDFF` echo.
-- 2 VRAM banks in CGB mode, selected through `FF4F` (VBK).
+- 2 VRAM banks in CGB mode, selected through `FF4F` (VBK). The PPU accesses each bank independently of CPU-selected VBK: bank 0 holds background tile IDs, bank 1 holds CGB attributes and optionally tile patterns.
+- First **160×144 RGB555 background framebuffer** available as read-only `Bus::framebuffer()` (also via `Machine::bus().framebuffer()`). Supports scrolling and 256-pixel wrapping, both background tile maps, signed/unsigned tile-pattern addressing, the two tile bitplanes, BGP monochrome shade mapping in compatibility mode, and native CGB background attributes for tile bank, X/Y flip, and one of 8 background palettes.
+- Native CGB background palette RAM via BGPI/BGPD (`FF68/FF69`): index, write auto-increment and wrap, 64 palette bytes, and blocked BGPD access during mode 3 (writes still increment the index). Object palette RAM (`FF6A/FF6B`) remains unimplemented. The 15-bit colors are exported directly in RGB555; no LCD color correction is performed.
 - First PPU milestone: LCDC/STAT, LY/LYC and scroll/window/DMG palette register storage (FF40–FF45 and FF47–FF4B); nominal mode 2/3/0 progression across 456-dot visible scanlines, VBlank on LY=144–153, VBlank IRQ on line 144 and edge-triggered shared STAT IRQ. LCD disable resets and freezes the line clock. DMA (FF46) remains unimplemented.
-- **Simplified LCD timings:** mode 2 lasts 80 dots, mode 3 always 172 dots, and mode 0 uses the remaining 204 dots. Real mode 3 varies with scroll/window/object fetch stalls; the LY=153 early rollover, LCD startup details, pixel rendering, VRAM/OAM access blocking and CGB double-speed clock conversion are not modeled.
+- **Simplified LCD timings:** mode 2 lasts 80 dots, mode 3 always 172 dots, and mode 0 uses the remaining 204 dots. The entire visible BG scanline is sampled when mode 3 ends (dot 252), rather than pixel by pixel. Real mode 3 varies with scroll/window/object fetch stalls; the LY=153 early rollover, LCD startup details, mid-line register effects, VRAM/OAM access blocking and CGB double-speed clock conversion remain unimplemented. BG-to-OBJ priority bits will matter only once sprite rendering exists.
 - HRAM at `FF80–FFFE` and OAM storage at `FE00–FE9F`.
 - Basic differences between color mode and original Game Boy compatibility mode for the implemented bank selection.
 - Tests with synthetic, self-authored cartridge data and boundary/banking cases.
 
 ## Not implemented yet
 
-**No games can execute end to end.** STOP and CGB speed-switching, boot behavior, fine-grained interrupt/bus timing and cycle-accurate scheduling are not yet implemented. The CGB-specific edge cases for TAC writes and same-cycle timer reload writes still require hardware-reference verification. The PPU currently has only a simplified mode clock and register storage, **no pixel renderer**. APU, joypad, DMA, save states, and MBC1/MBC3/MBC5 are absent. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
+**No games can execute end to end.** STOP and CGB speed-switching, boot behavior, fine-grained interrupt/bus timing and cycle-accurate scheduling are not yet implemented. The CGB-specific edge cases for TAC writes and same-cycle timer reload writes still require hardware-reference verification. The PPU renders background scanlines but **does not draw the window or sprites**; it is not a complete pixel pipeline and has no frontend display. APU, joypad, DMA, save states, and MBC1/MBC3/MBC5 are absent. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
 
-The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts (including HALT idle steps and interrupt service) are nominal timings. `Machine::step` automatically advances the timer and nominal LCD dot clock **after each successful instruction/CPU step**; direct `Cpu::step` calls do not tick the bus. Timer and LCD register writes inside an instruction therefore take effect before its entire nominal cycle count is advanced, which is not real hardware timing. No complete scheduler or cycle-accurate CPU-to-bus synchronization exists. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
+The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts (including HALT idle steps and interrupt service) are nominal timings. `Machine::step` automatically advances the timer and nominal LCD dot clock **after each successful instruction/CPU step**; direct `Cpu::step` calls do not tick the bus. Timer and LCD register writes inside an instruction therefore take effect before its entire nominal cycle count is advanced, which is not real hardware timing. The framebuffer is updated line by line at the end of nominal mode 3 and reset to white on LCD disable. Its initial white pixels, CGB palette RAM initialization, and DMG grayscale shades are deterministic test/display choices, not claimed as real post-boot LCD colors. No complete scheduler or cycle-accurate CPU-to-bus synchronization exists. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
 
 ## Development
 
@@ -109,6 +114,9 @@ cargo test -p corvus-gbc
 - [Pan Docs — HALT](https://gbdev.io/pandocs/halt.html)
 - [Pan Docs — LCD Status Registers](https://gbdev.io/pandocs/STAT.html)
 - [Pan Docs — Rendering](https://gbdev.io/pandocs/Rendering.html)
+- [Pan Docs — Tile Maps](https://gbdev.io/pandocs/Tile_Maps.html)
+- [Pan Docs — Tile Data](https://gbdev.io/pandocs/Tile_Data.html)
+- [Pan Docs — Palettes](https://gbdev.io/pandocs/Palettes.html)
 - [Pan Docs — Interrupt Sources](https://gbdev.io/pandocs/Interrupt_Sources.html)
 
 All project-owned source files carry CorvusSoftware copyright and AGPL-3.0-only SPDX notices; CI enforces these headers. No copyrighted game ROMs or proprietary firmware are included.

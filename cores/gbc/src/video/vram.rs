@@ -23,7 +23,17 @@ impl VideoRam {
         if offset >= 0x2000 {
             return None;
         }
-        Some(self.banks[usize::from(self.selected_bank)][usize::from(offset)])
+        self.read_bank(address, self.selected_bank)
+    }
+
+    /// Internal PPU access to a specific VRAM bank, independent of VBK.
+    /// CPU-selected VBK must not change the display's tile-map fetch bank.
+    pub(crate) fn read_bank(&self, address: u16, bank: u8) -> Option<u8> {
+        let offset = address.checked_sub(0x8000)?;
+        if offset >= 0x2000 || bank > 1 || (bank == 1 && !self.cgb_mode) {
+            return None;
+        }
+        Some(self.banks[usize::from(bank)][usize::from(offset)])
     }
 
     pub(crate) fn write(&mut self, address: u16, value: u8) -> bool {
@@ -86,5 +96,20 @@ mod tests {
         assert_eq!(vram.read(0x7FFF), None);
         assert_eq!(vram.read(0xA000), None);
         assert!(!vram.write(0xA000, 0x10));
+    }
+
+    #[test]
+    fn ppu_reads_both_banks_regardless_of_cpu_vbk() {
+        let mut vram = VideoRam::new(true);
+        assert!(vram.write(0x9800, 0x12));
+        assert!(vram.write_bank_register(1));
+        assert!(vram.write(0x9800, 0xA9));
+        assert_eq!(vram.read(0x9800), Some(0xA9));
+        assert_eq!(vram.read_bank(0x9800, 0), Some(0x12));
+        assert_eq!(vram.read_bank(0x9800, 1), Some(0xA9));
+        assert_eq!(vram.read_bank(0x8000, 2), None);
+        assert_eq!(vram.read_bank(0xA000, 1), None);
+        let dmg = VideoRam::new(false);
+        assert_eq!(dmg.read_bank(0x9800, 1), None);
     }
 }

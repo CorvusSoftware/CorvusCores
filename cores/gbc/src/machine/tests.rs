@@ -288,3 +288,31 @@ fn ppu_requests_vblank_once_at_line_144_during_cpu_halt() {
     assert_eq!(machine.bus().read(0xFF0F), Some(0xE0));
     assert_eq!(machine.elapsed_t_cycles(), 65_684);
 }
+
+#[test]
+fn machine_exposes_rgb555_background_pixels_after_cpu_halt_steps() {
+    // The fixture runs in native CGB mode (header flag 0x80).
+    let mut machine = fixture(&[0x76]); // HALT
+    assert_eq!(
+        machine.bus().framebuffer().len(),
+        crate::SCREEN_WIDTH * crate::SCREEN_HEIGHT
+    );
+
+    assert!(machine.bus_mut().write(0x8000, 0xFF)); // tile 0 row 0, color 1
+    assert!(machine.bus_mut().write(0x9801, 1)); // next map cell uses blank tile 1
+    assert!(machine.bus_mut().write(0xFF68, 0x82)); // palette 0, color 1
+    assert!(machine.bus_mut().write(0xFF69, 0xE0)); // RGB555 green, low byte
+    assert!(machine.bus_mut().write(0xFF69, 0x03)); // high byte
+    assert!(machine.bus_mut().write(0xFF40, 0x91)); // LCD + BG + 8000 tile data
+
+    for _ in 0..62 {
+        assert_eq!(machine.step(), Ok(4));
+    }
+    assert_eq!(machine.bus().framebuffer()[0], 0x7FFF); // not rendered yet
+    assert_eq!(machine.step(), Ok(4)); // nominal transfer ends at dot 252
+    assert_eq!(machine.bus().framebuffer()[0], 0x03E0);
+    assert_eq!(machine.bus().framebuffer()[7], 0x03E0);
+    assert_eq!(machine.bus().framebuffer()[8], 0x7FFF);
+    assert_eq!(machine.bus().framebuffer()[crate::SCREEN_WIDTH], 0x7FFF);
+    assert_eq!(machine.elapsed_t_cycles(), 252);
+}

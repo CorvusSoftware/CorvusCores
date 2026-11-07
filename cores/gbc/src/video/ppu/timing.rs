@@ -5,6 +5,7 @@
 
 use super::{Mode, Ppu};
 use crate::interrupts::{Interrupt, InterruptController};
+use crate::video::VideoRam;
 
 const DOTS_PER_LINE: u16 = 456;
 const OAM_DOTS: u16 = 80;
@@ -15,9 +16,15 @@ const LAST_LINE: u8 = 153;
 impl Ppu {
     /// Advance the PPU in LCD dots (one dot per normal-speed CPU T-cycle).
     ///
-    /// No rendering/fetcher stalls, double-speed CGB conversion, or
-    /// CPU VRAM/OAM access restrictions are modeled yet.
-    pub(crate) fn tick(&mut self, dots: u32, interrupts: &mut InterruptController) {
+    /// Each visible scanline is rendered at the fixed end of mode 3.
+    /// Fetcher stalls, double-speed CGB conversion and CPU VRAM/OAM
+    /// access restrictions are not modeled yet.
+    pub(crate) fn tick(
+        &mut self,
+        dots: u32,
+        vram: &VideoRam,
+        interrupts: &mut InterruptController,
+    ) {
         if !self.lcd_enabled() {
             return;
         }
@@ -42,6 +49,7 @@ impl Ppu {
                         self.update_stat_line(interrupts);
                     }
                     TRANSFER_END_DOT => {
+                        self.render_background_line(vram);
                         self.mode = Mode::HBlank;
                         self.update_stat_line(interrupts);
                     }
