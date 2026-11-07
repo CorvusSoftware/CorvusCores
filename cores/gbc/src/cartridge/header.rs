@@ -1,4 +1,4 @@
-//! Game Boy / Game Boy Color cartridge header parsing and ROM-only storage.
+//! Game Boy / Game Boy Color cartridge header parsing.
 //!
 //! Hardware reference: <https://gbdev.io/pandocs/The_Cartridge_Header.html>
 
