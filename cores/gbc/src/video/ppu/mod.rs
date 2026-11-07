@@ -97,6 +97,18 @@ impl Ppu {
         self.lcdc & 0x80 != 0
     }
 
+    /// CPU VRAM reads/writes are blocked only during pixel transfer (mode 3).
+    /// The renderer still reads VRAM through the independent PPU path.
+    pub(crate) fn cpu_can_access_vram(&self) -> bool {
+        !self.lcd_enabled() || self.mode != Mode::Transfer
+    }
+
+    /// CPU OAM reads/writes are blocked during scan and transfer (modes 2/3).
+    /// DMA's independent OAM writes do not use this CPU-facing restriction.
+    pub(crate) fn cpu_can_access_oam(&self) -> bool {
+        !self.lcd_enabled() || matches!(self.mode, Mode::HBlank | Mode::VBlank)
+    }
+
     /// Fixed-size row-major framebuffer; each u16 stores RGB555 (bit 15 is 0).
     pub(crate) fn framebuffer(&self) -> &[u16] {
         &self.framebuffer
