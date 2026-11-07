@@ -73,7 +73,8 @@ impl Bus {
     /// CGB double-speed conversion is not implemented.
     pub fn tick_t_cycles(&mut self, cycles: u32) {
         self.timer.tick(cycles, &mut self.interrupts);
-        self.ppu.tick(cycles, &self.vram, &self.oam, &mut self.interrupts);
+        self.ppu
+            .tick(cycles, &self.vram, &self.oam, &mut self.interrupts);
     }
 
     pub fn request_interrupt(&mut self, interrupt: Interrupt) {
