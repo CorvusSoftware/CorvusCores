@@ -5,7 +5,7 @@
 
 use super::Ppu;
 use crate::interrupts::{Interrupt, InterruptController};
-use crate::video::VideoRam;
+use crate::video::{ObjectRam, VideoRam};
 
 fn write(ppu: &mut Ppu, irq: &mut InterruptController, address: u16, value: u8) {
     assert!(ppu.write(address, value, irq));
@@ -13,7 +13,7 @@ fn write(ppu: &mut Ppu, irq: &mut InterruptController, address: u16, value: u8) 
 
 fn tick(ppu: &mut Ppu, dots: u32, irq: &mut InterruptController) {
     let vram = VideoRam::new(false);
-    ppu.tick(dots, &vram, irq);
+    ppu.tick(dots, &vram, &ObjectRam::new(), irq);
 }
 
 fn mode(ppu: &Ppu) -> u8 {

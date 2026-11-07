@@ -53,10 +53,14 @@ src/
         ├── mod.rs       # LCD state and row-major RGB555 framebuffer
         ├── registers.rs # LCDC/STAT/LY/LYC, scroll and palette registers
         ├── timing.rs    # Nominal scanline, VBlank and STAT edge timing
-        ├── background.rs # BG tile-map, tile-pattern and attribute sampling
-        ├── palette.rs   # CGB BGPI/BGPD (FF68/FF69) and RGB555 lookup
-        ├── render_tests.rs # DMG/CGB tile, scroll and palette pixel tests
-        └── tests.rs     # LCD mode and interrupt regression tests
+        ├── background.rs  # Shared BG/window tile sampling, raw color metadata
+        ├── window.rs      # Window position, map selection and visible-line counter
+        ├── sprites.rs     # OBJ selection, transparency and priority compositing
+        ├── palette.rs     # CGB BG/OBJ palette RAM and RGB555 lookup
+        ├── render_tests.rs # BG tile, scrolling and palette pixel tests
+        ├── window_tests.rs # WX/WY, internal window line counter and CGB attrs
+        ├── sprite_tests.rs # 8x8/8x16 OBJ, priority, flips and palette tests
+        └── tests.rs      # LCD mode and interrupt regression tests
 ```
 
 Components are grouped by responsibility. Future audio, DMA, and input components should receive their own modules when there is functioning code for them. Avoid concentrating unrelated hardware in `lib.rs` or the bus.
@@ -78,19 +82,21 @@ Components are grouped by responsibility. Future audio, DMA, and input component
 - Explicit CPU errors for unsupported opcodes and unmapped hardware, rather than silently returning success.
 - 8 banks of WRAM in CGB mode, including `FF70` (SVBK), fixed bank 0, switchable banks 1–7, and the `E000–FDFF` echo.
 - 2 VRAM banks in CGB mode, selected through `FF4F` (VBK). The PPU accesses each bank independently of CPU-selected VBK: bank 0 holds background tile IDs, bank 1 holds CGB attributes and optionally tile patterns.
-- First **160×144 RGB555 background framebuffer** available as read-only `Bus::framebuffer()` (also via `Machine::bus().framebuffer()`). Supports scrolling and 256-pixel wrapping, both background tile maps, signed/unsigned tile-pattern addressing, the two tile bitplanes, BGP monochrome shade mapping in compatibility mode, and native CGB background attributes for tile bank, X/Y flip, and one of 8 background palettes.
-- Native CGB background palette RAM via BGPI/BGPD (`FF68/FF69`): index, write auto-increment and wrap, 64 palette bytes, and blocked BGPD access during mode 3 (writes still increment the index). Object palette RAM (`FF6A/FF6B`) remains unimplemented. The 15-bit colors are exported directly in RGB555; no LCD color correction is performed.
+- **160×144 RGB555 framebuffer** available as read-only `Bus::framebuffer()` (also via `Machine::bus().framebuffer()`). Supports background scrolling and wrapping, both tile maps, signed/unsigned tile-pattern addressing, BGP shades in compatibility mode, and native CGB tile-bank, palette and X/Y flip attributes.
+- **Window overlay:** WX minus 7 and WY-based vertical triggering, independent window map selection, BG/window shared tile sampling, CGB attributes and a dedicated window-line counter that advances only on visible window lines. WX=0 clipping and WX=166/167 visibility boundaries are covered by synthetic tests. Subtle mid-scanline WY/WX/LCDC interactions are not represented.
+- **Sprite (OBJ) scanline rendering:** 8×8 and 8×16 objects, 2bpp colors with color 0 transparent, flipping, DMG OBP0/OBP1, CGB palette and VRAM-bank selection, ten OAM entries selected per scanline, DMG smaller-X vs. CGB earlier-OAM priority, BG/OBJ priority including CGB LCDC.0 master override. OAM scan occurs at line render time, not at its real dot positions.
+- Native CGB BG/OBJ palette RAM via BGPI/BGPD (`FF68/FF69`) and OBPI/OBPD (`FF6A/FF6B`): separate 64-byte arrays, auto-increment and wrap, and blocked palette data access during mode 3 (writes still increment their index). The 15-bit colors are exported directly as RGB555 without LCD color correction.
 - First PPU milestone: LCDC/STAT, LY/LYC and scroll/window/DMG palette register storage (FF40–FF45 and FF47–FF4B); nominal mode 2/3/0 progression across 456-dot visible scanlines, VBlank on LY=144–153, VBlank IRQ on line 144 and edge-triggered shared STAT IRQ. LCD disable resets and freezes the line clock. DMA (FF46) remains unimplemented.
-- **Simplified LCD timings:** mode 2 lasts 80 dots, mode 3 always 172 dots, and mode 0 uses the remaining 204 dots. The entire visible BG scanline is sampled when mode 3 ends (dot 252), rather than pixel by pixel. Real mode 3 varies with scroll/window/object fetch stalls; the LY=153 early rollover, LCD startup details, mid-line register effects, VRAM/OAM access blocking and CGB double-speed clock conversion remain unimplemented. BG-to-OBJ priority bits will matter only once sprite rendering exists.
+- **Simplified LCD timings:** mode 2 lasts 80 dots, mode 3 always 172 dots, and mode 0 uses the remaining 204 dots. The entire BG/window/OBJ scanline is sampled when mode 3 ends (dot 252), rather than pixel by pixel. Real mode 3 varies with scrolling, window and sprite fetch stalls; the LY=153 early rollover, LCD startup, mid-line register writes, actual mode-2 OAM scanning, VRAM/OAM CPU access blocking and CGB double-speed conversion remain unimplemented.
 - HRAM at `FF80–FFFE` and OAM storage at `FE00–FE9F`.
 - Basic differences between color mode and original Game Boy compatibility mode for the implemented bank selection.
 - Tests with synthetic, self-authored cartridge data and boundary/banking cases.
 
 ## Not implemented yet
 
-**No games can execute end to end.** STOP and CGB speed-switching, boot behavior, fine-grained interrupt/bus timing and cycle-accurate scheduling are not yet implemented. The CGB-specific edge cases for TAC writes and same-cycle timer reload writes still require hardware-reference verification. The PPU renders background scanlines but **does not draw the window or sprites**; it is not a complete pixel pipeline and has no frontend display. APU, joypad, DMA, save states, and MBC1/MBC3/MBC5 are absent. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
+**No games can execute end to end.** STOP and CGB speed-switching, boot behavior, fine-grained interrupt/bus timing and cycle-accurate scheduling are not yet implemented. The CGB-specific edge cases for TAC writes and same-cycle timer reload writes still require hardware-reference verification. The PPU renders BG/window/OBJ scanlines but is **not a cycle-accurate pixel fetcher** and has no frontend display. APU, joypad, DMA, save states, and MBC1/MBC3/MBC5 are absent. Most I/O registers and access restrictions are intentionally not implemented. A bus read returning `None` means its behavior is not modeled yet, **not** that a real console necessarily returns an absent value.
 
-The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts (including HALT idle steps and interrupt service) are nominal timings. `Machine::step` automatically advances the timer and nominal LCD dot clock **after each successful instruction/CPU step**; direct `Cpu::step` calls do not tick the bus. Timer and LCD register writes inside an instruction therefore take effect before its entire nominal cycle count is advanced, which is not real hardware timing. The framebuffer is updated line by line at the end of nominal mode 3 and reset to white on LCD disable. Its initial white pixels, CGB palette RAM initialization, and DMG grayscale shades are deterministic test/display choices, not claimed as real post-boot LCD colors. No complete scheduler or cycle-accurate CPU-to-bus synchronization exists. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
+The current zero-initialized RAM and CPU registers are deterministic test starting states, not simulated hardware power-on conditions. CPU cycle counts (including HALT idle steps and interrupt service) are nominal timings. `Machine::step` automatically advances the timer and nominal LCD dot clock **after each successful instruction/CPU step**; direct `Cpu::step` calls do not tick the bus. Timer and LCD register writes inside an instruction therefore take effect before its entire nominal cycle count is advanced, which is not real hardware timing. The framebuffer is composited line by line at the end of nominal mode 3 and reset to white on LCD disable. Its initial white pixels, CGB palette RAM initialization, and DMG grayscale shades are deterministic test/display choices, not claimed as real post-boot LCD colors. No complete scheduler or cycle-accurate CPU-to-bus synchronization exists. Multi-byte stack and memory accesses can partially modify state when an unimplemented bus region rejects a later access. The preliminary mode selection from the cartridge header will eventually belong to boot/hardware initialization. Integration with CorvusSoftware's own API must follow its actual contract when it is available in this repository.
 
 ## Development
 
@@ -115,6 +121,9 @@ cargo test -p corvus-gbc
 - [Pan Docs — LCD Status Registers](https://gbdev.io/pandocs/STAT.html)
 - [Pan Docs — Rendering](https://gbdev.io/pandocs/Rendering.html)
 - [Pan Docs — Tile Maps](https://gbdev.io/pandocs/Tile_Maps.html)
+- [Pan Docs — Window](https://gbdev.io/pandocs/Window.html)
+- [Pan Docs — Object Attribute Memory](https://gbdev.io/pandocs/OAM.html)
+- [Pan Docs — LCD Control](https://gbdev.io/pandocs/LCDC.html)
 - [Pan Docs — Tile Data](https://gbdev.io/pandocs/Tile_Data.html)
 - [Pan Docs — Palettes](https://gbdev.io/pandocs/Palettes.html)
 - [Pan Docs — Interrupt Sources](https://gbdev.io/pandocs/Interrupt_Sources.html)

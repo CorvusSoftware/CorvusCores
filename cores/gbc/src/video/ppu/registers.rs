@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! LCD status, scrolling, DMG palettes, and CGB background palette RAM.
+//! LCD status, scrolling, DMG palettes and CGB BG/OBJ palette RAM.
 //!
-//! DMA ($FF46) and CGB object palettes ($FF6A/$FF6B) remain unmapped.
+//! OAM DMA ($FF46) and precise mode-3 fetch timing are not modeled.
 
 use super::background::WHITE;
 use super::{Mode, Ppu};
@@ -32,6 +32,11 @@ impl Ppu {
                 self.bg_palette
                     .read_data(self.lcd_enabled() && self.mode == Mode::Transfer),
             ),
+            0xFF6A if self.cgb_mode => Some(self.obj_palette.read_index()),
+            0xFF6B if self.cgb_mode => Some(
+                self.obj_palette
+                    .read_data(self.lcd_enabled() && self.mode == Mode::Transfer),
+            ),
             _ => None,
         }
     }
@@ -45,10 +50,15 @@ impl Ppu {
         match address {
             0xFF40 => {
                 let was_enabled = self.lcd_enabled();
+                let window_was_enabled = self.lcdc & 0x20 != 0;
                 self.lcdc = value;
                 if was_enabled != self.lcd_enabled() {
                     self.ly = 0;
                     self.dot = 0;
+                    self.window_line = 0;
+                    self.window_y_triggered = self.lcd_enabled() && self.wy == 0;
+                    self.bg_color_ids.fill(0);
+                    self.bg_priority.fill(false);
                     self.mode = if self.lcd_enabled() {
                         Mode::OamScan
                     } else {
@@ -59,6 +69,10 @@ impl Ppu {
                         self.framebuffer.fill(WHITE);
                     }
                     self.update_stat_line(interrupts);
+                } else if self.cgb_mode && window_was_enabled && self.lcdc & 0x20 == 0 {
+                    // On native CGB, clearing the Window Enable bit also
+                    // resets the latched WY match condition.
+                    self.window_y_triggered = false;
                 }
             }
             0xFF41 => {
@@ -81,6 +95,10 @@ impl Ppu {
             0xFF68 if self.cgb_mode => self.bg_palette.write_index(value),
             0xFF69 if self.cgb_mode => self
                 .bg_palette
+                .write_data(value, self.lcd_enabled() && self.mode == Mode::Transfer),
+            0xFF6A if self.cgb_mode => self.obj_palette.write_index(value),
+            0xFF6B if self.cgb_mode => self
+                .obj_palette
                 .write_data(value, self.lcd_enabled() && self.mode == Mode::Transfer),
             _ => return false,
         }

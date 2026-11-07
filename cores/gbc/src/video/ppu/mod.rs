@@ -3,24 +3,30 @@
 
 //! LCD control and simplified Game Boy PPU mode progression.
 //!
-//! Background pixels are rendered once per visible scanline, not per dot.
-//! Mode 3 still lasts a fixed 172 dots. Window/sprites, fetch stalls,
-//! LY=153's early rollover and LCD startup timing are not modeled.
+//! BG, window and OBJ pixels are composited once per visible scanline.
+//! Mode 3 still lasts a fixed 172 dots; pixel fetch stalls, subtle
+//! mid-scanline quirks, LY=153's rollover and LCD startup are not modeled.
 
 mod background;
 mod palette;
 mod registers;
+mod sprites;
 mod timing;
+mod window;
 
 use background::WHITE;
-use palette::BgPalette;
+use palette::CgbPaletteRam;
 
 use crate::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
 #[cfg(test)]
 mod render_tests;
 #[cfg(test)]
+mod sprite_tests;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod window_tests;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u8)]
@@ -49,7 +55,12 @@ pub(crate) struct Ppu {
     mode: Mode,
     stat_line: bool,
     cgb_mode: bool,
-    bg_palette: BgPalette,
+    bg_palette: CgbPaletteRam,
+    obj_palette: CgbPaletteRam,
+    window_line: u8,
+    window_y_triggered: bool,
+    bg_color_ids: [u8; SCREEN_WIDTH],
+    bg_priority: [bool; SCREEN_WIDTH],
     framebuffer: [u16; SCREEN_WIDTH * SCREEN_HEIGHT],
 }
 
@@ -72,7 +83,12 @@ impl Ppu {
             mode: Mode::HBlank,
             stat_line: false,
             cgb_mode,
-            bg_palette: BgPalette::new(),
+            bg_palette: CgbPaletteRam::new(),
+            obj_palette: CgbPaletteRam::new(),
+            window_line: 0,
+            window_y_triggered: false,
+            bg_color_ids: [0; SCREEN_WIDTH],
+            bg_priority: [false; SCREEN_WIDTH],
             framebuffer: [WHITE; SCREEN_WIDTH * SCREEN_HEIGHT],
         }
     }
