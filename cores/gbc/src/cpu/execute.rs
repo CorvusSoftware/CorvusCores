@@ -173,8 +173,7 @@ impl Cpu {
             }
             0x18 => {
                 let displacement = self.fetch8(bus)? as i8;
-                self.registers.pc =
-                    self.registers.pc.wrapping_add(i16::from(displacement) as u16);
+                self.registers.pc = self.registers.pc.wrapping_add(i16::from(displacement) as u16);
                 12
             }
             0x20 | 0x28 | 0x30 | 0x38 => {
@@ -210,8 +209,7 @@ impl Cpu {
             }
             0xFA => {
                 let address = self.fetch16(bus)?;
-                self.registers.a =
-                    bus.read(address).ok_or(CpuError::UnmappedRead { address })?;
+                self.registers.a = bus.read(address).ok_or(CpuError::UnmappedRead { address })?;
                 16
             }
             _ => {
