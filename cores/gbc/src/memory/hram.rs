@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 CorvusSoftware
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! CPU high RAM (FF80–FFFE). FFFF is an interrupt register, not HRAM.
 
 pub(crate) struct HighRam {
