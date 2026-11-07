@@ -149,9 +149,10 @@ mod tests {
         rom[0x0143] = cgb_flag;
         rom[0x0147] = cartridge_type;
         rom[0x0148] = rom_size_code;
-        rom[0x014D] = (0x0134..=0x014C).fold(0_u8, |sum, address| {
+        let checksum = (0x0134..=0x014C).fold(0_u8, |sum, address| {
             sum.wrapping_sub(rom[address]).wrapping_sub(1)
         });
+        rom[0x014D] = checksum;
         rom
     }
 
