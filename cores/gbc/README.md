@@ -18,7 +18,9 @@ src/
 ├── cpu/
 │   ├── mod.rs          # CPU state and public exports
 │   ├── registers.rs    # SM83 registers and F flag invariants
-│   ├── execute.rs      # Partial base-opcode dispatch and nominal T-cycles
+│   ├── execute.rs      # Base opcode dispatch and nominal T-cycle results
+│   ├── control_flow.rs # JR/JP, CALL/RET, RST and condition evaluation
+│   ├── control_flow_tests.rs # Conditional branches, cycles and error contracts
 │   ├── interrupts.rs   # IME, EI/DI/RETI, IRQ service and HALT behavior
 │   ├── interrupt_tests.rs # Delays, IRQ priority and HALT regression tests
 │   ├── load.rs         # Indirect, indexed, and high-memory transfers
@@ -89,7 +91,7 @@ The bus maintains a single owner for cartridge, memories, timers, PPU and both D
 - Partial SM83 CPU interpreter: register pairs and flag masking, all eight 8-bit accumulator ALU families (ADD, ADC, SUB, SBC, AND, XOR, OR, CP), including register, (HL), and immediate forms; JP/JR branches, and nominal instruction T-cycle counts.
 - SM83 transfer module: LD (BC/DE),A and LD A,(BC/DE), auto-increment/decrement LD (HL+/-),A and LD A,(HL+/-), high-memory LDH (a8),A / LDH A,(a8) and LD (C),A / LD A,(C), plus absolute LD (a16),A / LD A,(a16). Transfers preserve flags, use wrapping HL arithmetic, and fail explicitly for unsupported I/O rather than fabricating register behavior.
 - Additional arithmetic/flag instructions: DAA, CPL, SCF, CCF, RLCA/RRCA/RLA/RRA, ADD HL,r16, ADD SP,e8, and LD HL,SP+e8. Unit tests exercise carry/half-carry edge cases and two-digit BCD addition/subtraction.
-- SM83 stack and control flow: PUSH/POP (including AF masking), CALL/RET (conditional and unconditional), RST vectors, JP HL, LD SP,HL and LD (a16),SP. Stack accesses use the current partial bus and report unmapped-address errors.
+- SM83 stack and control flow: PUSH/POP (including AF masking), CALL/RET (conditional and unconditional), RST vectors, JP HL, LD SP,HL and LD (a16),SP. Stack accesses use the current partial bus and report unmapped-address errors. The condition decoder and JR/JP/CALL/RET/RST execution now live in `cpu/control_flow.rs`; `cpu/execute.rs` remains the opcode dispatcher, and `cpu/stack.rs` owns stack access semantics. This extraction preserves PC/SP side effects, flags, conditional cycle counts and unsupported-opcode errors.
 - The complete 256-entry **CB-prefixed** SM83 instruction space: RLC, RRC, RL, RR, SLA, SRA, SWAP, SRL, BIT, RES and SET, for registers and `(HL)` where applicable. BIT preserves carry and does not write its operand; `(HL)` variants have distinct nominal timings.
 - Explicit CPU errors for unsupported opcodes and unmapped hardware, rather than silently returning success.
 - 8 banks of WRAM in CGB mode, including `FF70` (SVBK), fixed bank 0, switchable banks 1–7, and the `E000–FDFF` echo.
