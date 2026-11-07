@@ -3,7 +3,7 @@
 
 //! LCD control and simplified Game Boy PPU mode progression.
 //!
-//! Background pixels are rendered once per visible scanline, not per dot.
+//! BG, window and OBJ pixels are composited once per visible scanline.
 //! Mode 3 still lasts a fixed 172 dots; pixel fetch stalls, subtle
 //! mid-scanline quirks, LY=153's rollover and LCD startup are not modeled.
 
