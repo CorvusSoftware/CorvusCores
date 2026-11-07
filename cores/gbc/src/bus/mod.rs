@@ -3,11 +3,10 @@
 
 //! Partial 16-bit address bus for the Game Boy Color.
 //!
-//! A partial CPU-facing memory bus, not a cycle-accurate hardware bus.
-//! VRAM/OAM gating follows nominal LCD modes, and both DMA controllers
-//! advance in T-cycle steps. CPU/DMA source-bus conflicts, true per-access timing,
-//! boot ROM mapping and most I/O are not implemented. Unsupported reads
-//! return `None`, unsupported writes `false`.
+//! A partial CPU-visible bus, not a cycle-accurate hardware bus.
+//! `cpu_access` maps reads/writes; `clock` advances peripherals and DMA.
+//! LCD-mode gating, DMA source paths and DMG/CGB modes stay distinct.
+//! CPU/DMA bus conflicts, per-access timing and most I/O remain unmodeled.
 
 use crate::cartridge::{CgbSupport, RomOnlyCartridge};
 use crate::dma::{OamDma, VramDma};
@@ -16,8 +15,12 @@ use crate::memory::{HighRam, WorkRam};
 use crate::timer::Timer;
 use crate::video::{ObjectRam, Ppu, VideoRam};
 
+mod clock;
+mod cpu_access;
 #[cfg(test)]
 mod dma_tests;
+#[cfg(test)]
+mod tests;
 #[cfg(test)]
 mod timing_tests;
 #[cfg(test)]
@@ -78,71 +81,6 @@ impl Bus {
         self.ppu.framebuffer()
     }
 
-    /// Advance timer, OAM DMA, CGB VRAM DMA and PPU in normal-speed T-cycles.
-    /// CPU executes at instruction boundaries rather than at individual bus
-    /// accesses, and CGB double-speed clock conversion is not modeled.
-    pub fn tick_t_cycles(&mut self, cycles: u32) {
-        for _ in 0..cycles {
-            self.timer.tick(1, &mut self.interrupts);
-            if let Some((source, destination)) = self.dma.tick_t_cycle() {
-                let value = self.read_dma_source(source);
-                self.oam.write(destination, value);
-            }
-            if let Some((source, destination)) = self.vram_dma.tick_t_cycle() {
-                let value = self.read_vram_dma_source(source);
-                // The LCD engine and VRAM DMA have independent access paths.
-                // Bank selection follows VBK at the moment of the transfer.
-                self.vram.write(destination, value);
-            }
-            let was_hblank = self.ppu.visible_hblank();
-            self.ppu
-                .tick(1, &self.vram, &self.oam, &mut self.interrupts);
-            if !was_hblank && self.ppu.visible_hblank() {
-                self.vram_dma.begin_hblank();
-            }
-        }
-    }
-
-    /// True if GDMA or an active HBlank block currently holds the CPU.
-    pub fn vram_dma_cpu_stalled(&self) -> bool {
-        self.vram_dma.stalls_cpu()
-    }
-
-    /// True for ongoing GDMA or a HDMA waiting for the next visible HBlank.
-    pub fn vram_dma_active(&self) -> bool {
-        self.vram_dma.active()
-    }
-
-    /// True while FF46 has an unfinished OAM transfer.
-    pub fn oam_dma_active(&self) -> bool {
-        self.dma.active()
-    }
-
-    /// VRAM DMA source reads do not consult CPU LCD-mode access gating.
-    /// Unsupported, absent cartridge RAM and invalid VRAM sources are FF
-    /// placeholders, not claims about physical open-bus signal behavior.
-    fn read_vram_dma_source(&self, address: u16) -> u8 {
-        match address {
-            0x0000..=0x7FFF => self.cartridge.read_rom(address).unwrap_or(0xFF),
-            0xA000..=0xBFFF => 0xFF,
-            0xC000..=0xDFFF => self.wram.read(address).unwrap_or(0xFF),
-            _ => 0xFF,
-        }
-    }
-
-    /// Source reads bypass CPU LCD-mode access restrictions.
-    /// Pages outside 00–DF are not currently hardware-accurate: an
-    /// unsupported source gives the deterministic placeholder FF.
-    fn read_dma_source(&self, address: u16) -> u8 {
-        match address {
-            0x0000..=0x7FFF => self.cartridge.read_rom(address).unwrap_or(0xFF),
-            0x8000..=0x9FFF => self.vram.read(address).unwrap_or(0xFF),
-            0xA000..=0xBFFF => 0xFF, // ROM-only cartridge RAM is absent.
-            0xC000..=0xDFFF => self.wram.read(address).unwrap_or(0xFF),
-            _ => 0xFF,
-        }
-    }
-
     pub fn request_interrupt(&mut self, interrupt: Interrupt) {
         self.interrupts.request(interrupt);
     }
@@ -155,185 +93,5 @@ impl Bus {
     /// performed separately by the CPU.
     pub fn acknowledge_interrupt(&mut self, interrupt: Interrupt) {
         self.interrupts.acknowledge(interrupt);
-    }
-
-    /// Read an implemented address. `None` means not yet modeled, not
-    /// necessarily a specific value returned by real hardware.
-    pub fn read(&self, address: u16) -> Option<u8> {
-        match address {
-            0x0000..=0x7FFF => self.cartridge.read_rom(address),
-            0x8000..=0x9FFF => {
-                if self.ppu.cpu_can_access_vram() {
-                    self.vram.read(address)
-                } else {
-                    Some(0xFF)
-                }
-            }
-            // ROM-only cartridges have no external RAM installed.
-            0xA000..=0xBFFF => Some(0xFF),
-            0xC000..=0xFDFF => self.wram.read(address),
-            0xFE00..=0xFE9F => {
-                if self.ppu.cpu_can_access_oam() && !self.dma.active() {
-                    self.oam.read(address)
-                } else {
-                    Some(0xFF)
-                }
-            }
-            0xFF04..=0xFF07 => self.timer.read(address),
-            0xFF0F => Some(self.interrupts.read_if()),
-            0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read(address),
-            0xFF46 => Some(self.dma.source_high()),
-            0xFF4F => self.vram.read_bank_register(),
-            0xFF51..=0xFF55 if self.mode == HardwareMode::Cgb => self.vram_dma.read(address),
-            0xFF68..=0xFF6B => self.ppu.read(address),
-            0xFF70 => self.wram.read_bank_register(),
-            0xFF80..=0xFFFE => self.hram.read(address),
-            0xFFFF => Some(self.interrupts.read_ie()),
-            _ => None,
-        }
-    }
-
-    /// Write to an implemented address. `false` means the target is
-    /// unsupported; writes to ROM or absent cartridge RAM are valid no-ops.
-    pub fn write(&mut self, address: u16, value: u8) -> bool {
-        match address {
-            0x0000..=0x7FFF | 0xA000..=0xBFFF => true,
-            0x8000..=0x9FFF => {
-                if self.ppu.cpu_can_access_vram() {
-                    self.vram.write(address, value)
-                } else {
-                    true // CPU write ignored, not an unsupported address.
-                }
-            }
-            0xC000..=0xFDFF => self.wram.write(address, value),
-            0xFE00..=0xFE9F => {
-                if self.ppu.cpu_can_access_oam() && !self.dma.active() {
-                    self.oam.write(address, value)
-                } else {
-                    true // CPU write ignored while PPU or DMA owns OAM.
-                }
-            }
-            0xFF04..=0xFF07 => self.timer.write(address, value),
-            0xFF0F => {
-                self.interrupts.write_if(value);
-                true
-            }
-            0xFF40..=0xFF45 | 0xFF47..=0xFF4B => {
-                let written = self.ppu.write(address, value, &mut self.interrupts);
-                if address == 0xFF40 && !self.ppu.lcd_enabled() {
-                    self.vram_dma.lcd_disabled();
-                }
-                written
-            }
-            0xFF46 => {
-                self.dma.start(value);
-                true
-            }
-            0xFF4F => self.vram.write_bank_register(value),
-            0xFF51..=0xFF55 if self.mode == HardwareMode::Cgb => {
-                self.vram_dma.write(address, value, self.ppu.lcd_enabled())
-            }
-            0xFF68..=0xFF6B => self.ppu.write(address, value, &mut self.interrupts),
-            0xFF70 => self.wram.write_bank_register(value),
-            0xFF80..=0xFFFE => self.hram.write(address, value),
-            0xFFFF => {
-                self.interrupts.write_ie(value);
-                true
-            }
-            _ => false,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{Bus, HardwareMode};
-    use crate::cartridge::RomOnlyCartridge;
-
-    fn test_bus(flag: u8) -> Bus {
-        let mut rom = vec![0_u8; 0x8000];
-        rom[0] = 0x42;
-        rom[0x0143] = flag;
-        Bus::new(RomOnlyCartridge::new(rom).unwrap())
-    }
-
-    #[test]
-    fn routes_rom_without_mutating_rom_only_cartridges() {
-        let mut bus = test_bus(0x80);
-        assert_eq!(bus.read(0), Some(0x42));
-        assert!(bus.write(0, 0x55));
-        assert_eq!(bus.read(0), Some(0x42));
-        assert_eq!(bus.read(0xA000), Some(0xFF));
-        assert!(bus.write(0xA000, 0x33));
-        assert_eq!(bus.read(0xA000), Some(0xFF));
-    }
-
-    #[test]
-    fn routes_vram_wram_echo_oam_and_hram() {
-        let mut bus = test_bus(0xC0);
-        for (addr, value) in [
-            (0x8000, 1),
-            (0x9FFF, 2),
-            (0xC000, 3),
-            (0xD000, 4),
-            (0xFE00, 5),
-            (0xFE9F, 6),
-            (0xFF80, 7),
-            (0xFFFE, 8),
-        ] {
-            assert!(bus.write(addr, value));
-            assert_eq!(bus.read(addr), Some(value));
-        }
-        assert_eq!(bus.read(0xE000), Some(3));
-        assert_eq!(bus.read(0xF000), Some(4));
-        assert!(bus.write(0xFDFF, 9));
-        assert_eq!(bus.read(0xDDFF), Some(9));
-        assert_eq!(bus.read(0xFEA0), None);
-        assert!(!bus.write(0xFEA0, 1));
-    }
-
-    #[test]
-    fn banking_registers_route_to_their_own_components() {
-        let mut bus = test_bus(0x80);
-        assert_eq!(bus.mode(), HardwareMode::Cgb);
-        assert!(bus.write(0x8000, 0x10));
-        assert!(bus.write(0xFF4F, 0x01));
-        assert_eq!(bus.read(0xFF4F), Some(0xFF));
-        assert!(bus.write(0x8000, 0x20));
-        assert!(bus.write(0xFF4F, 0));
-        assert_eq!(bus.read(0x8000), Some(0x10));
-        assert!(bus.write(0xFF4F, 1));
-        assert_eq!(bus.read(0x8000), Some(0x20));
-
-        assert!(bus.write(0xD000, 0x40));
-        assert!(bus.write(0xFF70, 3));
-        assert!(bus.write(0xD000, 0x60));
-        assert_eq!(bus.read(0xFF70), Some(0xFB));
-        assert!(bus.write(0xFF70, 0));
-        assert_eq!(bus.read(0xD000), Some(0x40));
-        assert_eq!(bus.read(0xFF70), Some(0xF8));
-        assert!(bus.write(0xFF70, 3));
-        assert_eq!(bus.read(0xD000), Some(0x60));
-    }
-
-    #[test]
-    fn original_game_boy_titles_use_compatibility_banking() {
-        let mut bus = test_bus(0x00);
-        assert_eq!(bus.mode(), HardwareMode::DmgCompatibility);
-        assert!(!bus.write(0xFF4F, 1));
-        assert!(!bus.write(0xFF70, 3));
-        assert_eq!(bus.read(0xFF4F), None);
-        assert_eq!(bus.read(0xFF70), None);
-        assert!(bus.write(0xD000, 0x77));
-        assert_eq!(bus.read(0xD000), Some(0x77));
-    }
-
-    #[test]
-    fn unsupported_registers_are_not_silently_fake_mapped() {
-        let mut bus = test_bus(0x80);
-        for addr in [0xFEA0, 0xFF00, 0xFF01] {
-            assert_eq!(bus.read(addr), None);
-            assert!(!bus.write(addr, 0xAA));
-        }
     }
 }
