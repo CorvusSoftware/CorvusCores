@@ -13,7 +13,8 @@ fn bc_and_de_indirect_loads_and_stores_preserve_flags_and_registers() {
     cpu.registers.set_bc(0xC123);
     cpu.registers.set_de(0xD234);
     cpu.registers.a = 0xA5;
-    cpu.registers.set_flags(FLAG_ZERO | FLAG_SUBTRACT | FLAG_HALF_CARRY | FLAG_CARRY);
+    cpu.registers
+        .set_flags(FLAG_ZERO | FLAG_SUBTRACT | FLAG_HALF_CARRY | FLAG_CARRY);
 
     assert_eq!(cpu.step(&mut bus), Ok(8));
     assert_eq!(bus.read(0xC123), Some(0xA5));
