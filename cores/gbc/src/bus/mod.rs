@@ -52,7 +52,7 @@ impl Bus {
             hram: HighRam::new(),
             vram: VideoRam::new(color),
             oam: ObjectRam::new(),
-            ppu: Ppu::new(),
+            ppu: Ppu::new(color),
             timer: Timer::new(),
             interrupts: InterruptController::new(),
         }
@@ -62,12 +62,18 @@ impl Bus {
         self.mode
     }
 
+    /// Completed scanline pixels, row-major RGB555, 160 × 144.
+    /// Read-only; no framebuffer front/back swap or frontend API exists yet.
+    pub fn framebuffer(&self) -> &[u16] {
+        self.ppu.framebuffer()
+    }
+
     /// Advance timers and the simplified PPU using normal-speed CPU T-cycles.
     /// Direct Cpu::step calls do not advance these components automatically.
     /// CGB double-speed conversion is not implemented.
     pub fn tick_t_cycles(&mut self, cycles: u32) {
         self.timer.tick(cycles, &mut self.interrupts);
-        self.ppu.tick(cycles, &mut self.interrupts);
+        self.ppu.tick(cycles, &self.vram, &mut self.interrupts);
     }
 
     pub fn request_interrupt(&mut self, interrupt: Interrupt) {
@@ -98,6 +104,7 @@ impl Bus {
             0xFF0F => Some(self.interrupts.read_if()),
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read(address),
             0xFF4F => self.vram.read_bank_register(),
+            0xFF68..=0xFF69 => self.ppu.read(address),
             0xFF70 => self.wram.read_bank_register(),
             0xFF80..=0xFFFE => self.hram.read(address),
             0xFFFF => Some(self.interrupts.read_ie()),
@@ -122,6 +129,7 @@ impl Bus {
                 self.ppu.write(address, value, &mut self.interrupts)
             }
             0xFF4F => self.vram.write_bank_register(value),
+            0xFF68..=0xFF69 => self.ppu.write(address, value, &mut self.interrupts),
             0xFF70 => self.wram.write_bank_register(value),
             0xFF80..=0xFFFE => self.hram.write(address, value),
             0xFFFF => {
