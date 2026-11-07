@@ -10,7 +10,7 @@ use super::{Cpu, CpuError, FLAG_CARRY, FLAG_ZERO};
 use crate::bus::Bus;
 
 impl Cpu {
-    fn fetch8(&mut self, bus: &Bus) -> Result<u8, CpuError> {
+    pub(super) fn fetch8(&mut self, bus: &Bus) -> Result<u8, CpuError> {
         let address = self.registers.pc;
         let value = bus
             .read(address)
@@ -19,7 +19,7 @@ impl Cpu {
         Ok(value)
     }
 
-    fn fetch16(&mut self, bus: &Bus) -> Result<u16, CpuError> {
+    pub(super) fn fetch16(&mut self, bus: &Bus) -> Result<u16, CpuError> {
         let low = self.fetch8(bus)?;
         let high = self.fetch8(bus)?;
         Ok(u16::from_le_bytes([low, high]))
@@ -91,6 +91,8 @@ impl Cpu {
                 let cb_opcode = self.fetch8(bus)?;
                 self.execute_cb(cb_opcode, bus)?
             }
+            0x02 | 0x12 | 0x0A | 0x1A | 0x22 | 0x32 | 0x2A | 0x3A | 0xE0 | 0xF0
+            | 0xE2 | 0xF2 | 0xEA | 0xFA => self.execute_transfer(opcode, bus)?,
             0x01 | 0x11 | 0x21 | 0x31 => {
                 let value = self.fetch16(bus)?;
                 self.registers.write_pair((opcode >> 4) & 0x03, value);
@@ -301,20 +303,6 @@ impl Cpu {
                 } else {
                     12
                 }
-            }
-            0xEA => {
-                let address = self.fetch16(bus)?;
-                if !bus.write(address, self.registers.a) {
-                    return Err(CpuError::UnmappedWrite { address });
-                }
-                16
-            }
-            0xFA => {
-                let address = self.fetch16(bus)?;
-                self.registers.a = bus
-                    .read(address)
-                    .ok_or(CpuError::UnmappedRead { address })?;
-                16
             }
             _ => {
                 self.registers.pc = opcode_address;
