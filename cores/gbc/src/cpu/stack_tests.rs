@@ -192,18 +192,32 @@ fn ld_a16_sp_writes_low_byte_first_across_memory_regions() {
 #[test]
 fn stack_errors_remain_explicit_for_unimplemented_bus_regions() {
     let (mut cpu, mut bus) = fixture(&[0xC5]); // PUSH BC
-    cpu.registers.sp = 0;
+    cpu.registers.set_bc(0x1234);
+    cpu.registers.sp = 0xFF05;
+    // First write at FF04 resets DIV; second at FF03 is not mapped.
     assert_eq!(
         cpu.step(&mut bus),
-        Err(CpuError::UnmappedWrite { address: 0xFFFF })
+        Err(CpuError::UnmappedWrite { address: 0xFF03 })
     );
-    assert_eq!(cpu.registers.sp, 0xFFFF);
+    assert_eq!(cpu.registers.sp, 0xFF03);
+    assert_eq!(bus.read(0xFF04), Some(0));
 
     let (mut cpu, mut bus) = fixture(&[0xC9]); // RET
-    cpu.registers.sp = 0xFFFF;
+    cpu.registers.sp = 0xFF03;
     assert_eq!(
         cpu.step(&mut bus),
-        Err(CpuError::UnmappedRead { address: 0xFFFF })
+        Err(CpuError::UnmappedRead { address: 0xFF03 })
     );
-    assert_eq!(cpu.registers.sp, 0xFFFF);
+    assert_eq!(cpu.registers.sp, 0xFF03);
+}
+
+#[test]
+fn pushing_across_ffff_now_writes_ie_and_hram() {
+    let (mut cpu, mut bus) = fixture(&[0xC5]); // PUSH BC
+    cpu.registers.sp = 0;
+    cpu.registers.set_bc(0xABCD);
+    assert_eq!(cpu.step(&mut bus), Ok(16));
+    assert_eq!(cpu.registers.sp, 0xFFFE);
+    assert_eq!(bus.read(0xFFFF), Some(0xAB));
+    assert_eq!(bus.read(0xFFFE), Some(0xCD));
 }
