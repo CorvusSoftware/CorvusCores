@@ -54,8 +54,14 @@ fn rom_banking_has_fixed_bank_zero_and_allows_bank_twenty_forty_sixty() {
     assert_eq!(mapper.read_rom(0x3FFF), Some(0));
     assert_eq!(mapper.read_rom(0x4000), Some(1));
     for (selected, expected) in [
-        (0, 1), (2, 2), (0x20, 0x20), (0x40, 0x40),
-        (0x60, 0x60), (0x7F, 0x7F), (0x80, 1), (0xFF, 0x7F),
+        (0, 1),
+        (2, 2),
+        (0x20, 0x20),
+        (0x40, 0x40),
+        (0x60, 0x60),
+        (0x7F, 0x7F),
+        (0x80, 1),
+        (0xFF, 0x7F),
     ] {
         assert!(mapper.write_rom(0x2000, selected));
         assert_eq!(mapper.read_rom(0x4000), Some(expected));
