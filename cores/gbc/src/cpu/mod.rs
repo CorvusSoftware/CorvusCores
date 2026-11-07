@@ -11,6 +11,10 @@ mod cb;
 mod error;
 mod execute;
 mod registers;
+mod stack;
+
+#[cfg(test)]
+mod stack_tests;
 
 #[cfg(test)]
 mod cb_tests;
