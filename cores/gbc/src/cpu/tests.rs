@@ -169,13 +169,13 @@ fn returns_explicit_error_instead_of_faking_unimplemented_hardware() {
 }
 
 #[test]
-fn unsupported_halt_opcode_keeps_pc_at_faulting_instruction() {
-    let (mut cpu, mut bus) = fixture(&[0x76]);
+fn unsupported_stop_opcode_keeps_pc_at_faulting_instruction() {
+    let (mut cpu, mut bus) = fixture(&[0x10]);
     assert_eq!(
         cpu.step(&mut bus),
         Err(CpuError::UnsupportedOpcode {
             address: 0,
-            opcode: 0x76,
+            opcode: 0x10,
         })
     );
     assert_eq!(cpu.registers.pc, 0);

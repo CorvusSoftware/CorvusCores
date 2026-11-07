@@ -15,7 +15,11 @@ impl Cpu {
         let value = bus
             .read(address)
             .ok_or(CpuError::UnmappedRead { address })?;
-        self.registers.pc = address.wrapping_add(1);
+        if self.halt_bug {
+            self.halt_bug = false;
+        } else {
+            self.registers.pc = address.wrapping_add(1);
+        }
         Ok(value)
     }
 
@@ -76,17 +80,45 @@ impl Cpu {
         }
     }
 
-    /// Executes one supported opcode and returns its nominal number of T-cycles.
+    /// Execute one supported instruction, interrupt entry, or HALT idle step.
     ///
-    /// This is not a transactional operation if a later operand or data access
-    /// fails: the PC (and possibly registers) may already have advanced.
+    /// Returns nominal T-cycles, without advancing bus peripherals. On
+    /// unmapped memory errors, PC, SP or memory may already be modified.
     /// Unsupported opcodes restore the PC to the opcode address.
     pub fn step(&mut self, bus: &mut Bus) -> Result<u8, CpuError> {
+        if let Some(cycles) = self.service_interrupt(bus)? {
+            return Ok(cycles);
+        }
+        if self.halted {
+            return Ok(4);
+        }
+
+        let scheduled_before = self.ime_enable_pending;
         let opcode_address = self.registers.pc;
         let opcode = self.fetch8(bus)?;
 
         let cycles = match opcode {
             0x00 => 4, // NOP
+            0x76 => {
+                self.execute_halt(bus);
+                4
+            }
+            0xF3 => {
+                self.ime = false;
+                self.ime_enable_pending = false;
+                4
+            }
+            0xFB => {
+                self.ime_enable_pending = true;
+                4
+            }
+            0xD9 => {
+                let address = self.pop16(bus)?;
+                self.registers.pc = address;
+                self.ime = true;
+                self.ime_enable_pending = false;
+                16
+            }
             0xCB => {
                 let cb_opcode = self.fetch8(bus)?;
                 self.execute_cb(cb_opcode, bus)?
@@ -312,6 +344,7 @@ impl Cpu {
                 });
             }
         };
+        self.finish_ime_delay(scheduled_before, opcode);
         Ok(cycles)
     }
 }

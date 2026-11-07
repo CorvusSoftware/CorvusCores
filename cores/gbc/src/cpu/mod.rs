@@ -3,8 +3,8 @@
 
 //! Partial SM83 CPU interpreter.
 //!
-//! No boot ROM sequence, interrupts, HALT, STOP, or timing of bus peripherals.
-//! Only instructions implemented in `execute` may be stepped.
+//! Interrupt service and HALT are modeled at instruction boundaries.
+//! No boot ROM, STOP, or cycle-accurate bus/peripheral scheduling exists.
 
 mod alu;
 
@@ -13,8 +13,11 @@ mod alu_tests;
 mod cb;
 mod error;
 mod execute;
+mod interrupts;
 mod load;
 
+#[cfg(test)]
+mod interrupt_tests;
 #[cfg(test)]
 mod load_tests;
 mod registers;
@@ -35,6 +38,10 @@ pub use registers::{Registers, FLAG_CARRY, FLAG_HALF_CARRY, FLAG_SUBTRACT, FLAG_
 #[derive(Clone, Debug, Default)]
 pub struct Cpu {
     pub registers: Registers,
+    ime: bool,
+    ime_enable_pending: bool,
+    halted: bool,
+    halt_bug: bool,
 }
 
 impl Cpu {
