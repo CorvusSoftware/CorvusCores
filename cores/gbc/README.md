@@ -11,6 +11,7 @@ src/
 │   └── mod.rs          # Partial 16-bit address routing
 ├── cartridge/
 │   ├── mod.rs          # Cartridge component exports
+│   ├── error.rs        # Cartridge errors
 │   ├── header.rs       # Header fields, CGB flag, checksum
 │   ├── rom_only.rs     # 32 KiB ROM-only cartridge
 │   └── tests.rs        # Synthetic cartridge tests
