@@ -177,19 +177,19 @@ fn unsupported_io_transfers_report_errors_and_keep_registers_intact() {
 fn indirect_loads_do_not_modify_hl_or_a_when_the_bus_rejects_access() {
     for opcode in [0x02, 0x0A, 0x12, 0x1A, 0x22, 0x2A, 0x32, 0x3A] {
         let (mut cpu, mut bus) = fixture(&[opcode]);
-        cpu.registers.set_bc(0xFF46);
-        cpu.registers.set_de(0xFF46);
-        cpu.registers.set_hl(0xFF46);
+        cpu.registers.set_bc(0xFF03);
+        cpu.registers.set_de(0xFF03);
+        cpu.registers.set_hl(0xFF03);
         cpu.registers.a = 0xBD;
         cpu.registers.set_flags(FLAG_ZERO | FLAG_SUBTRACT);
 
         let expected = if [0x02, 0x12, 0x22, 0x32].contains(&opcode) {
-            CpuError::UnmappedWrite { address: 0xFF46 }
+            CpuError::UnmappedWrite { address: 0xFF03 }
         } else {
-            CpuError::UnmappedRead { address: 0xFF46 }
+            CpuError::UnmappedRead { address: 0xFF03 }
         };
         assert_eq!(cpu.step(&mut bus), Err(expected), "opcode {opcode:02X}");
-        assert_eq!(cpu.registers.hl(), 0xFF46);
+        assert_eq!(cpu.registers.hl(), 0xFF03);
         assert_eq!(cpu.registers.a, 0xBD);
         assert_eq!(cpu.registers.flags(), FLAG_ZERO | FLAG_SUBTRACT);
         assert_eq!(cpu.registers.pc, 1);
