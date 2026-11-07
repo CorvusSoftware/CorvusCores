@@ -23,7 +23,11 @@ impl Ppu {
         }
 
         let origin_x = i16::from(self.wx) - 7;
-        let map_base = if self.lcdc & 0x40 != 0 { 0x9C00 } else { 0x9800 };
+        let map_base = if self.lcdc & 0x40 != 0 {
+            0x9C00
+        } else {
+            0x9800
+        };
         let line_offset = usize::from(self.ly) * SCREEN_WIDTH;
         let window_y = self.window_line;
 
