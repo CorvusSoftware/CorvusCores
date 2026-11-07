@@ -1,0 +1,29 @@
+// SPDX-FileCopyrightText: 2026 CorvusSoftware
+// SPDX-License-Identifier: AGPL-3.0-only
+
+//! Partial SM83 CPU interpreter.
+//!
+//! No boot ROM sequence, interrupts, HALT, STOP, or timing of bus peripherals.
+//! Only instructions implemented in `execute` may be stepped.
+
+mod error;
+mod execute;
+mod registers;
+
+#[cfg(test)]
+mod tests;
+
+pub use error::CpuError;
+pub use registers::{Registers, FLAG_CARRY, FLAG_HALF_CARRY, FLAG_SUBTRACT, FLAG_ZERO};
+
+/// A CPU with explicitly initialized state; not a hardware power-on snapshot.
+#[derive(Clone, Debug, Default)]
+pub struct Cpu {
+    pub registers: Registers,
+}
+
+impl Cpu {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
