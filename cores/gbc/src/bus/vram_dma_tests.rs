@@ -93,10 +93,10 @@ fn hdma_runs_one_block_per_visible_hblank_and_skips_vblank() {
     assert_eq!(bus.vram.read_bank(0x800F, 0), Some(0x5A));
     assert_eq!(bus.vram.read_bank(0x8010, 0), Some(0));
 
-    bus.tick_t_cycles(456 - 32);
+    bus.tick_t_cycles(456);
     assert_eq!(bus.read(0xFF55), Some(0)); // second block copied
     assert_eq!(bus.vram.read_bank(0x8010, 0), Some(0x45));
-    bus.tick_t_cycles(32);
+    bus.tick_t_cycles(456);
     assert!(!bus.vram_dma_active());
     assert_eq!(bus.read(0xFF55), Some(0xFF));
     assert_eq!(bus.vram.read_bank(0x802F, 0), Some(0x7A));
