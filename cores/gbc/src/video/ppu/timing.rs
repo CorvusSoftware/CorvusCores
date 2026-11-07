@@ -17,8 +17,9 @@ impl Ppu {
     /// Advance the PPU in LCD dots (one dot per normal-speed CPU T-cycle).
     ///
     /// Each visible scanline is rendered at the fixed end of mode 3.
-    /// Fetcher stalls, double-speed CGB conversion and CPU VRAM/OAM
-    /// access restrictions are not modeled yet.
+    /// Fetcher stalls and double-speed CGB conversion are not modeled.
+    /// CPU VRAM/OAM access restrictions follow these nominal mode transitions
+    /// through the bus, not individual bus-access T-cycles.
     pub(crate) fn tick(
         &mut self,
         dots: u32,
