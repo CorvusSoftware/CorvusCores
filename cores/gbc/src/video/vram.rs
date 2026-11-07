@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 CorvusSoftware
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Two banks of 8 KiB video RAM; VBK selects the CPU-visible bank.
 
 pub(crate) struct VideoRam {
