@@ -20,6 +20,8 @@ use crate::video::{ObjectRam, Ppu, VideoRam};
 mod dma_tests;
 #[cfg(test)]
 mod timing_tests;
+#[cfg(test)]
+mod vram_dma_tests;
 
 /// Mode selected from the cartridge's header at this early stage.
 ///
