@@ -39,7 +39,18 @@ The project's public entry point is [README.md](README.md). Keep that README sta
 
 ## Licensing
 
-The project is distributed under **AGPL-3.0-only**; see [LICENSE](LICENSE). Preserve the full license text and applicable notices. Check the licenses and redistribution permissions of third-party code and assets before adding them, and document any required attributions. Never paste code from an incompatible project without appropriate authorization.
+The project is distributed under **AGPL-3.0-only**; see [LICENSE](LICENSE). Preserve the full license text and applicable notices.
+
+**Every newly created or modified CorvusSoftware-owned source file must carry an explicit SPDX header at the top.** For Rust source files, use:
+
+```rust
+// SPDX-FileCopyrightText: 2026 CorvusSoftware
+// SPDX-License-Identifier: AGPL-3.0-only
+```
+
+For TOML, YAML, Python, and shell scripts, use the equivalent `#` comment syntax. Preserve the actual copyright years and owners of third-party code; **never falsely reassign authorship or overwrite upstream license notices**. The full license remains in the repository's root `LICENSE` file, not duplicated in every source.
+
+Check the licenses and redistribution permissions of third-party code and assets before adding them, and document any required attributions. Never paste code from an incompatible project without appropriate authorization.
 
 ## Documentation and handoff
 
