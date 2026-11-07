@@ -11,8 +11,7 @@ use super::{Cpu, CpuError};
 use crate::bus::Bus;
 
 fn read_memory(bus: &Bus, address: u16) -> Result<u8, CpuError> {
-    bus.read(address)
-        .ok_or(CpuError::UnmappedRead { address })
+    bus.read(address).ok_or(CpuError::UnmappedRead { address })
 }
 
 fn write_memory(bus: &mut Bus, address: u16, value: u8) -> Result<(), CpuError> {
@@ -26,11 +25,7 @@ fn write_memory(bus: &mut Bus, address: u16, value: u8) -> Result<(), CpuError> 
 impl Cpu {
     /// Execute the remaining register-indirect, auto-indexed and high-memory
     /// transfer forms, returning their nominal number of T-cycles.
-    pub(super) fn execute_transfer(
-        &mut self,
-        opcode: u8,
-        bus: &mut Bus,
-    ) -> Result<u8, CpuError> {
+    pub(super) fn execute_transfer(&mut self, opcode: u8, bus: &mut Bus) -> Result<u8, CpuError> {
         match opcode {
             0x02 | 0x12 => {
                 let address = if opcode == 0x02 {
