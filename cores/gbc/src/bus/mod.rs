@@ -86,7 +86,8 @@ impl Bus {
                 let value = self.read_dma_source(source);
                 self.oam.write(destination, value);
             }
-            self.ppu.tick(1, &self.vram, &self.oam, &mut self.interrupts);
+            self.ppu
+                .tick(1, &self.vram, &self.oam, &mut self.interrupts);
         }
     }
 
