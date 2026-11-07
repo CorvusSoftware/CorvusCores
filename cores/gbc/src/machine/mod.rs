@@ -4,9 +4,10 @@
 //! Instruction-boundary orchestration for the incomplete GBC emulator.
 //!
 //! CPU instructions, HALT idle steps and interrupt entry return nominal
-//! CPU T-cycles. This runner advances the timer by that count *after* the
-//! entire CPU step. It does not yet interleave memory accesses with the timer,
-//! and is not a cycle-accurate scheduler or the CorvusSoftware frontend API.
+//! CPU T-cycles. This runner advances the timer and simplified LCD PPU by
+//! that count *after* the entire CPU step. It does not interleave memory
+//! accesses with peripherals and is not a cycle-accurate scheduler or
+//! the CorvusSoftware frontend API.
 
 use crate::bus::Bus;
 use crate::cartridge::RomOnlyCartridge;
@@ -15,7 +16,7 @@ use crate::cpu::{Cpu, CpuError};
 #[cfg(test)]
 mod tests;
 
-/// Owns the CPU and bus so a completed CPU step advances the timer once.
+/// Owns the CPU and bus so a completed CPU step clocks peripherals once.
 pub struct Machine {
     cpu: Cpu,
     bus: Bus,
@@ -56,15 +57,15 @@ impl Machine {
         self.elapsed_t_cycles
     }
 
-    /// Execute one CPU step, then advance DIV/TIMA and interrupt requests.
+    /// Execute one CPU step, then advance timers, LCD modes and IRQ requests.
     ///
-    /// The next step observes a timer interrupt generated in this step. If
+    /// The next step observes any interrupt generated in this step. If
     /// execution fails, no time is advanced or accounted, although existing
     /// CPU and bus operations may already have changed state.
     ///
-    /// This remains *instruction-boundary* timing: writes to timer registers
-    /// take effect before the step's T-cycles are advanced, not at their
-    /// real per-M-cycle location.
+    /// This remains *instruction-boundary* timing: writes to timer/LCD
+    /// registers take effect before the step's T-cycles are advanced, not
+    /// at their real per-M-cycle location.
     pub fn step(&mut self) -> Result<u8, CpuError> {
         let cycles = self.cpu.step(&mut self.bus)?;
         self.bus.tick_t_cycles(u32::from(cycles));
