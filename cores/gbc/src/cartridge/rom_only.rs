@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 CorvusSoftware
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Storage for supported 32 KiB ROM-only cartridges.
 
 use super::{CartridgeError, CartridgeHeader};
