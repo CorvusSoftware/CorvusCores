@@ -56,7 +56,7 @@ impl Bus {
     fn read_vram_dma_source(&self, address: u16) -> u8 {
         match address {
             0x0000..=0x7FFF => self.cartridge.read_rom(address).unwrap_or(0xFF),
-            0xA000..=0xBFFF => 0xFF,
+            0xA000..=0xBFFF => self.cartridge.read_ram(address).unwrap_or(0xFF),
             0xC000..=0xDFFF => self.wram.read(address).unwrap_or(0xFF),
             _ => 0xFF,
         }
@@ -69,7 +69,7 @@ impl Bus {
         match address {
             0x0000..=0x7FFF => self.cartridge.read_rom(address).unwrap_or(0xFF),
             0x8000..=0x9FFF => self.vram.read(address).unwrap_or(0xFF),
-            0xA000..=0xBFFF => 0xFF, // ROM-only cartridge RAM is absent.
+            0xA000..=0xBFFF => self.cartridge.read_ram(address).unwrap_or(0xFF),
             0xC000..=0xDFFF => self.wram.read(address).unwrap_or(0xFF),
             _ => 0xFF,
         }
