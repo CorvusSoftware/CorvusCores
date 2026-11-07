@@ -1,19 +1,19 @@
 // SPDX-FileCopyrightText: 2026 CorvusSoftware
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! CGB background palette RAM ($FF68/$FF69), using packed RGB555 colors.
+//! Shared CGB background / object palette RAM, storing RGB555 colors.
 //!
-//! Palette RAM initializes to deterministic white for tests, not a simulated
-//! CGB boot state. During pixel transfer, BGPD reads return $FF and writes
-//! do not modify RAM, but still advance BGPI if auto-increment is enabled.
+//! Each palette RAM initializes to deterministic white for tests, not a simulated
+//! CGB boot state. During pixel transfer, data reads return $FF and writes
+//! do not modify RAM, but still advance the palette index if auto-increment is enabled.
 
 #[derive(Debug)]
-pub(super) struct BgPalette {
+pub(super) struct CgbPaletteRam {
     data: [u8; 64],
     index: u8,
 }
 
-impl BgPalette {
+impl CgbPaletteRam {
     pub(super) fn new() -> Self {
         Self {
             data: [0xFF; 64],
