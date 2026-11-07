@@ -56,6 +56,12 @@ impl Machine {
         &mut self.bus
     }
 
+    /// Advance the independent MBC3 RTC by an explicitly supplied duration.
+    /// No RTC time is inferred from CPU cycles or host wall-clock time.
+    pub fn advance_rtc_seconds(&mut self, seconds: u64) {
+        self.bus.advance_rtc_seconds(seconds);
+    }
+
     /// Total nominal T-cycles from successful Machine::step calls.
     ///
     /// Includes CPU steps (instructions, HALT idle and interrupt entry) and

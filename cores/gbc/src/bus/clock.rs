@@ -35,6 +35,12 @@ impl Bus {
         }
     }
 
+    /// Explicit independent RTC time advance; CPU/PPU/DMA T-cycle clocks
+    /// never imply elapsed wall-clock seconds for battery RTC cartridges.
+    pub fn advance_rtc_seconds(&mut self, seconds: u64) {
+        self.cartridge.advance_rtc_seconds(seconds);
+    }
+
     /// True if GDMA or an active HBlank block currently holds the CPU.
     pub fn vram_dma_cpu_stalled(&self) -> bool {
         self.vram_dma.stalls_cpu()
