@@ -86,4 +86,3 @@ impl Ppu {
         &self.framebuffer
     }
 }
-
