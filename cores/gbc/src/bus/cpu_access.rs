@@ -21,8 +21,7 @@ impl Bus {
                     Some(0xFF)
                 }
             }
-            // ROM-only cartridges have no external RAM installed.
-            0xA000..=0xBFFF => Some(0xFF),
+            0xA000..=0xBFFF => self.cartridge.read_ram(address),
             0xC000..=0xFDFF => self.wram.read(address),
             0xFE00..=0xFE9F => {
                 if self.ppu.cpu_can_access_oam() && !self.dma.active() {
@@ -49,7 +48,8 @@ impl Bus {
     /// unsupported; writes to ROM or absent cartridge RAM are valid no-ops.
     pub fn write(&mut self, address: u16, value: u8) -> bool {
         match address {
-            0x0000..=0x7FFF | 0xA000..=0xBFFF => true,
+            0x0000..=0x7FFF => self.cartridge.write_rom(address, value),
+            0xA000..=0xBFFF => self.cartridge.write_ram(address, value),
             0x8000..=0x9FFF => {
                 if self.ppu.cpu_can_access_vram() {
                     self.vram.write(address, value)

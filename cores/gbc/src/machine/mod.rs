@@ -8,7 +8,7 @@
 //! This is not cycle-accurate bus arbitration or the CorvusSoftware frontend API.
 
 use crate::bus::Bus;
-use crate::cartridge::RomOnlyCartridge;
+use crate::cartridge::Cartridge;
 use crate::cpu::Cpu;
 
 mod scheduler;
@@ -28,7 +28,7 @@ pub struct Machine {
 
 impl Machine {
     /// Start from deterministic zero-initialized test state, not a boot ROM.
-    pub fn new(cartridge: RomOnlyCartridge) -> Self {
+    pub fn new(cartridge: impl Into<Cartridge>) -> Self {
         Self {
             cpu: Cpu::new(),
             bus: Bus::new(cartridge),

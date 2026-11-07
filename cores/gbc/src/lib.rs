@@ -3,7 +3,7 @@
 
 //! Game Boy Color core foundations.
 //!
-//! Cartridge parsing, memory, partial SM83 execution, timers, interrupts
+//! Cartridge parsing, ROM-only/MBC1 banking, partial SM83 execution, timers, interrupts
 //! and nominal LCD mode timing have initial implementations. The machine
 //! runner clocks peripherals at instruction boundaries, not per bus access.
 //! Initial background, window and sprite scanline rendering is available;
