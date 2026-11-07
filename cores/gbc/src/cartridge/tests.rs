@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 CorvusSoftware
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Unit tests for cartridge header and ROM-only storage.
 
 use super::header::MIN_HEADER_LENGTH;
