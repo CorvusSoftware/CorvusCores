@@ -9,8 +9,8 @@ pub(super) const ROM_ONLY_LENGTH: usize = 0x8000;
 
 /// A 32 KiB cartridge without an MBC or external RAM.
 ///
-/// Other cartridge types are rejected explicitly until their own mappers
-/// are implemented; the ROM bytes are not silently treated as ROM-only.
+/// This direct constructor accepts only type 00. The higher-level
+/// `Cartridge::load` dispatches other supported mapper types explicitly.
 #[derive(Debug)]
 pub struct RomOnlyCartridge {
     rom: Box<[u8]>,
