@@ -10,6 +10,11 @@
 
 #[cfg(test)]
 mod tests;
+mod vram;
+#[cfg(test)]
+mod vram_tests;
+
+pub(crate) use vram::VramDma;
 
 const OAM_LENGTH: u16 = 160;
 const T_CYCLES_PER_BYTE: u8 = 4;
