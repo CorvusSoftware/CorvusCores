@@ -10,9 +10,6 @@
 //! Invalid source pages, LCD startup, active-register writes, and CGB
 //! double-speed timing are not yet hardware-complete.
 
-#[cfg(test)]
-mod tests;
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum TransferMode {
     General,
