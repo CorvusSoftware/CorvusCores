@@ -3,12 +3,19 @@
 
 //! LCD control and simplified Game Boy PPU mode progression.
 //!
-//! This is NOT a renderer. Mode 3 uses its minimum 172-dot duration;
-//! scroll/window/sprite fetch stalls, LY=153's early rollover,
-//! memory arbitration and initial LCD startup timing are not modeled.
+//! Background pixels are rendered once per visible scanline, not per dot.
+//! Mode 3 still lasts a fixed 172 dots. Window/sprites, fetch stalls,
+//! LY=153's early rollover and LCD startup timing are not modeled.
 
+mod background;
+mod palette;
 mod registers;
 mod timing;
+
+use background::WHITE;
+use palette::BgPalette;
+
+use crate::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
 #[cfg(test)]
 mod tests;
@@ -39,11 +46,14 @@ pub(crate) struct Ppu {
     dot: u16,
     mode: Mode,
     stat_line: bool,
+    cgb_mode: bool,
+    bg_palette: BgPalette,
+    framebuffer: [u16; SCREEN_WIDTH * SCREEN_HEIGHT],
 }
 
 impl Ppu {
     /// Deterministic LCD-off state; not a DMG/CGB power-on snapshot.
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(cgb_mode: bool) -> Self {
         Self {
             lcdc: 0,
             stat_enable: 0,
@@ -59,16 +69,19 @@ impl Ppu {
             dot: 0,
             mode: Mode::HBlank,
             stat_line: false,
+            cgb_mode,
+            bg_palette: BgPalette::new(),
+            framebuffer: [WHITE; SCREEN_WIDTH * SCREEN_HEIGHT],
         }
     }
 
     fn lcd_enabled(&self) -> bool {
         self.lcdc & 0x80 != 0
     }
-}
 
-impl Default for Ppu {
-    fn default() -> Self {
-        Self::new()
+    /// Fixed-size row-major framebuffer; each u16 stores RGB555 (bit 15 is 0).
+    pub(crate) fn framebuffer(&self) -> &[u16] {
+        &self.framebuffer
     }
 }
+
