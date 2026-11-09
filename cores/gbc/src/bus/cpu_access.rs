@@ -33,6 +33,8 @@ impl Bus {
             0xFF00 => Some(self.joypad.read()),
             0xFF04..=0xFF07 => self.timer.read(address),
             0xFF0F => Some(self.interrupts.read_if()),
+            0xFF10..=0xFF26 => self.apu.read(address),
+            0xFF30..=0xFF3F => self.apu.read(address),
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read(address),
             0xFF46 => Some(self.dma.source_high()),
             0xFF4F => self.vram.read_bank_register(),
@@ -71,6 +73,8 @@ impl Bus {
                 true
             }
             0xFF04..=0xFF07 => self.timer.write(address, value),
+            0xFF10..=0xFF26 => self.apu.write(address, value),
+            0xFF30..=0xFF3F => self.apu.write(address, value),
             0xFF0F => {
                 self.interrupts.write_if(value);
                 true

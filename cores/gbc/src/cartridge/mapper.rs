@@ -3,10 +3,10 @@
 
 //! Cartridge-owned mapper dispatch, separate from the system memory bus.
 //!
-//! The enum makes unsupported hardware explicit: MBC2, MBC5 and other
+//! The enum makes unsupported hardware explicit: MBC2 and other
 //! specialty controllers are not silently treated as standard MBC3.
 
-use super::{CartridgeError, CartridgeHeader, Mbc1Cartridge, Mbc3Cartridge, RomOnlyCartridge};
+use super::{CartridgeError, CartridgeHeader, Mbc1Cartridge, Mbc3Cartridge, Mbc5Cartridge, RomOnlyCartridge};
 
 /// A loaded cartridge with its mapper and mutable external RAM state.
 #[derive(Debug)]
@@ -14,6 +14,7 @@ pub enum Cartridge {
     RomOnly(RomOnlyCartridge),
     Mbc1(Mbc1Cartridge),
     Mbc3(Mbc3Cartridge),
+    Mbc5(Mbc5Cartridge),
 }
 
 impl Cartridge {
@@ -24,6 +25,7 @@ impl Cartridge {
             0x00 => Ok(Self::RomOnly(RomOnlyCartridge::new(rom)?)),
             0x01..=0x03 => Ok(Self::Mbc1(Mbc1Cartridge::new(rom)?)),
             0x0F..=0x13 => Ok(Self::Mbc3(Mbc3Cartridge::new(rom)?)),
+            0x19..=0x1E => Ok(Self::Mbc5(Mbc5Cartridge::new(rom)?)),
             code => Err(CartridgeError::UnsupportedCartridgeType { code }),
         }
     }
@@ -33,6 +35,7 @@ impl Cartridge {
             Self::RomOnly(cartridge) => cartridge.header(),
             Self::Mbc1(cartridge) => cartridge.header(),
             Self::Mbc3(cartridge) => cartridge.header(),
+            Self::Mbc5(cartridge) => cartridge.header(),
         }
     }
 
@@ -41,6 +44,7 @@ impl Cartridge {
             Self::RomOnly(cartridge) => cartridge.read_rom(address),
             Self::Mbc1(cartridge) => cartridge.read_rom(address),
             Self::Mbc3(cartridge) => cartridge.read_rom(address),
+            Self::Mbc5(cartridge) => cartridge.read_rom(address),
         }
     }
 
@@ -49,6 +53,7 @@ impl Cartridge {
             Self::RomOnly(_) => address <= 0x7FFF,
             Self::Mbc1(cartridge) => cartridge.write_rom(address, value),
             Self::Mbc3(cartridge) => cartridge.write_rom(address, value),
+            Self::Mbc5(cartridge) => cartridge.write_rom(address, value),
         }
     }
 
@@ -58,6 +63,7 @@ impl Cartridge {
             Self::RomOnly(_) => (0xA000..=0xBFFF).contains(&address).then_some(0xFF),
             Self::Mbc1(cartridge) => cartridge.read_ram(address),
             Self::Mbc3(cartridge) => cartridge.read_ram(address),
+            Self::Mbc5(cartridge) => cartridge.read_ram(address),
         }
     }
 
@@ -66,6 +72,7 @@ impl Cartridge {
             Self::RomOnly(_) => (0xA000..=0xBFFF).contains(&address),
             Self::Mbc1(cartridge) => cartridge.write_ram(address, value),
             Self::Mbc3(cartridge) => cartridge.write_ram(address, value),
+            Self::Mbc5(cartridge) => cartridge.write_ram(address, value),
         }
     }
     /// Advance RTC oscillator time when supplied by the host/frontend.
@@ -92,5 +99,11 @@ impl From<Mbc1Cartridge> for Cartridge {
 impl From<Mbc3Cartridge> for Cartridge {
     fn from(cartridge: Mbc3Cartridge) -> Self {
         Self::Mbc3(cartridge)
+    }
+}
+
+impl From<Mbc5Cartridge> for Cartridge {
+    fn from(cartridge: Mbc5Cartridge) -> Self {
+        Self::Mbc5(cartridge)
     }
 }

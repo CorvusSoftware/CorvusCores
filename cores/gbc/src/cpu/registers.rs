@@ -3,13 +3,15 @@
 
 //! SM83 register file, with the low nibble of F permanently masked off.
 
+use serde::{Deserialize, Serialize};
+
 pub const FLAG_ZERO: u8 = 0x80;
 pub const FLAG_SUBTRACT: u8 = 0x40;
 pub const FLAG_HALF_CARRY: u8 = 0x20;
 pub const FLAG_CARRY: u8 = 0x10;
 
 /// Default is an all-zero test state, not a DMG/CGB post-boot register state.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Registers {
     pub a: u8,
     pub b: u8,
@@ -18,7 +20,7 @@ pub struct Registers {
     pub e: u8,
     pub h: u8,
     pub l: u8,
-    f: u8,
+    pub f: u8,
     pub sp: u16,
     pub pc: u16,
 }

@@ -38,8 +38,8 @@ fn loader_dispatches_all_standard_mbc3_types_and_rejects_other_mappers() {
         assert_eq!(cart.header().cartridge_type, kind);
     }
     assert!(matches!(
-        Cartridge::load(rom(1, 0, 0x19)),
-        Err(CartridgeError::UnsupportedCartridgeType { code: 0x19 })
+        Cartridge::load(rom(1, 0, 0x19)).unwrap(),
+        Cartridge::Mbc5(_)
     ));
     assert!(matches!(
         Mbc3Cartridge::new(rom(1, 0, 0x01)),

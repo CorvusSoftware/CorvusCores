@@ -59,9 +59,9 @@ fn main() {
         false
     } else {
         // Auto-detect from cartridge header
-        use corvus_gbc::cartridge::{CartridgeHeader, CgbSupport};
+        use corvus_gbc::cartridge::CartridgeHeader;
         match CartridgeHeader::parse(&rom_data) {
-            Ok(header) => matches!(header.cgb_support, CgbSupport::Enhanced | CgbSupport::Exclusive),
+            Ok(header) => matches!(header.cgb_support, corvus_gbc::cartridge::CgbSupport::Enhanced | corvus_gbc::cartridge::CgbSupport::Exclusive),
             Err(_) => false, // Default to DMG if header parsing fails
         }
     };
@@ -101,7 +101,6 @@ fn main() {
         machine.bus_mut().joypad.update_state(joypad_state);
         
         // Run emulation until we complete a frame
-        // A frame is complete when LY goes from 153 back to 0
         let _start_ly = machine.bus().ly();
         let mut cycles = 0u64;
         let mut steps = 0u64;
@@ -127,6 +126,11 @@ fn main() {
             
             // Frame complete when LY wraps around
             if current_ly < prev_ly && prev_ly >= 144 {
+                // Get audio samples from APU
+                let audio_samples = machine.bus_mut().apu.get_audio_buffer();
+                if !audio_samples.is_empty() {
+                    frontend.queue_audio(audio_samples);
+                }
                 break;
             }
             

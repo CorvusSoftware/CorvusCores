@@ -8,6 +8,7 @@
 //! LCD-mode gating, DMA source paths and DMG/CGB modes stay distinct.
 //! CPU/DMA bus conflicts, per-access timing and most I/O remain unmodeled.
 
+use crate::apu::Apu;
 use crate::cartridge::{Cartridge, CgbSupport};
 use crate::dma::{OamDma, VramDma};
 use crate::interrupts::{Interrupt, InterruptController};
@@ -53,6 +54,7 @@ pub struct Bus {
     timer: Timer,
     interrupts: InterruptController,
     pub joypad: Joypad,
+    pub apu: Apu,
 }
 
 impl Bus {
@@ -76,6 +78,7 @@ impl Bus {
             timer: Timer::new(),
             interrupts: InterruptController::new(),
             joypad: Joypad::new(),
+            apu: Apu::new(),
         }
     }
 

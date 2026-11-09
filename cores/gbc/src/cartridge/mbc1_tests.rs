@@ -41,8 +41,8 @@ fn loader_dispatches_supported_types_and_preserves_rom_only_contracts() {
         Cartridge::Mbc3(_)
     ));
     assert!(matches!(
-        Cartridge::load(rom(1, 0, 0x19)),
-        Err(CartridgeError::UnsupportedCartridgeType { code: 0x19 })
+        Cartridge::load(rom(1, 0, 0x19)).unwrap(),
+        Cartridge::Mbc5(_)
     ));
     assert!(matches!(
         RomOnlyCartridge::new(rom(1, 0, 1)),

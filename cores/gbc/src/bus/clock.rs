@@ -10,12 +10,13 @@
 use super::Bus;
 
 impl Bus {
-    /// Advance timer, OAM DMA, CGB VRAM DMA and PPU in normal-speed T-cycles.
+    /// Advance timer, APU, OAM DMA, CGB VRAM DMA and PPU in normal-speed T-cycles.
     /// CPU executes at instruction boundaries rather than at individual bus
     /// accesses, and CGB double-speed clock conversion is not modeled.
     pub fn tick_t_cycles(&mut self, cycles: u32) {
         for _ in 0..cycles {
             self.timer.tick(1, &mut self.interrupts);
+            self.apu.clock();
             if let Some((source, destination)) = self.dma.tick_t_cycle() {
                 let value = self.read_dma_source(source);
                 self.oam.write(destination, value);

@@ -192,3 +192,17 @@ Controls:
 - [Pan Docs — Interrupt Sources](https://gbdev.io/pandocs/Interrupt_Sources.html)
 
 All project-owned source files carry CorvusSoftware copyright and AGPL-3.0-only SPDX notices; CI enforces these headers. No copyrighted game ROMs or proprietary firmware are included.
+
+## New Features Added
+
+- **MBC5 Support**: Full MBC5 mapper implementation with up to 512 ROM banks (64 MiB) and 16 RAM banks (128 KiB)
+- **Save States**: Basic save state infrastructure with serde/bincode (full component serialization in progress)
+
+## Save States
+
+Save state functionality is partially implemented. The infrastructure is in place with:
+- `save_state()` function to serialize machine state
+- `load_state()` function to deserialize and restore state
+- Version checking to handle format changes
+
+Full serialization of all components (CPU, Bus, PPU, APU, etc.) requires adding `Serialize` and `Deserialize` derives to all core structs, which is in progress.

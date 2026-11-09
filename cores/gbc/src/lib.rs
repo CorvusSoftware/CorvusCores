@@ -11,6 +11,7 @@
 //! OAM and CGB VRAM DMA plus CPU video-memory gating remain preliminary
 //! instruction-boundary models rather than a complete hardware bus.
 
+pub mod apu;
 pub mod boot;
 pub mod bus;
 pub mod cartridge;
@@ -21,6 +22,7 @@ pub mod interrupts;
 pub mod joypad;
 pub mod machine;
 mod memory;
+pub mod save;
 pub mod timer;
 mod video;
 

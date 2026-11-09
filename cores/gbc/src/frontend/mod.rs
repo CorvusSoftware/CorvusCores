@@ -4,7 +4,9 @@
 //! SDL2-based frontend for the GBC emulator.
 //!
 //! Provides a simple window to display the PPU framebuffer and handle input.
+//! Also handles audio output through SDL2's audio subsystem.
 
+use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
@@ -16,11 +18,56 @@ const SCALE: u32 = 4;
 const WINDOW_WIDTH: u32 = SCREEN_WIDTH as u32 * SCALE;
 const WINDOW_HEIGHT: u32 = SCREEN_HEIGHT as u32 * SCALE;
 
+/// Audio sample rate (48 kHz).
+const AUDIO_SAMPLE_RATE: i32 = 48000;
+
+/// Audio buffer size in samples (stereo).
+const AUDIO_BUFFER_SIZE: usize = 1024;
+
+/// Audio callback for SDL2.
+/// This is a simple callback that reads from a shared audio buffer.
+struct AudioCallbackData {
+    audio_buffer: std::sync::Mutex<Vec<f32>>,
+}
+
+impl AudioCallback for AudioCallbackData {
+    type Channel = f32;
+
+    fn callback(&mut self, out: &mut [Self::Channel]) {
+        let mut buffer = self.audio_buffer.lock().unwrap();
+        
+        // Fill output with zeros if no data available
+        let available = buffer.len();
+        if available == 0 {
+            for sample in out.iter_mut() {
+                *sample = 0.0;
+            }
+            return;
+        }
+        
+        // Copy available samples
+        let samples_to_copy = std::cmp::min(available, out.len());
+        out[..samples_to_copy].copy_from_slice(&buffer[..samples_to_copy]);
+        
+        // Remove consumed samples
+        if samples_to_copy > 0 {
+            buffer.drain(..samples_to_copy);
+        }
+        
+        // Fill remaining with zeros
+        for sample in out[samples_to_copy..].iter_mut() {
+            *sample = 0.0;
+        }
+    }
+}
+
 /// SDL2 frontend state.
 pub struct Frontend {
     _sdl_context: sdl2::Sdl,
     canvas: sdl2::render::WindowCanvas,
     event_pump: sdl2::EventPump,
+    _audio_device: Option<AudioDevice<AudioCallbackData>>,
+    audio_data: Option<AudioCallbackData>,
 }
 
 impl Frontend {
@@ -46,12 +93,44 @@ impl Frontend {
             .map_err(|e| e.to_string())?;
 
         let event_pump = sdl_context.event_pump()?;
+        
+        // Initialize audio
+        let audio_subsystem = sdl_context.audio()?;
+        let (_audio_device, audio_data) = Self::init_audio(audio_subsystem)?;
 
         Ok(Self {
             _sdl_context: sdl_context,
             canvas,
             event_pump,
+            _audio_device,
+            audio_data,
         })
+    }
+    
+    /// Initialize SDL2 audio.
+    fn init_audio(audio_subsystem: sdl2::AudioSubsystem) -> Result<(Option<AudioDevice<AudioCallbackData>>, Option<AudioCallbackData>), String> {
+        let desired_spec = AudioSpecDesired {
+            freq: Some(AUDIO_SAMPLE_RATE),
+            channels: Some(2), // Stereo
+            samples: Some(AUDIO_BUFFER_SIZE as u16),
+        };
+        
+        let audio_data = AudioCallbackData {
+            audio_buffer: std::sync::Mutex::new(Vec::with_capacity(AUDIO_BUFFER_SIZE * 2)),
+        };
+        
+        match audio_subsystem.open_playback(None, &desired_spec, |spec| {
+            // Recreate the callback with the actual spec
+            AudioCallbackData {
+                audio_buffer: std::sync::Mutex::new(Vec::with_capacity(spec.size as usize * 2)),
+            }
+        }) {
+            Ok(device) => Ok((Some(device), Some(audio_data))),
+            Err(e) => {
+                eprintln!("Warning: Could not open audio device: {}", e);
+                Ok((None, None))
+            }
+        }
     }
 
     /// Update the canvas with the current framebuffer.
@@ -85,6 +164,14 @@ impl Frontend {
     pub fn render(&mut self) -> Result<(), String> {
         self.canvas.present();
         Ok(())
+    }
+
+    /// Add audio samples to the audio buffer.
+    pub fn queue_audio(&mut self, samples: Vec<f32>) {
+        if let Some(ref audio_data) = self.audio_data {
+            let mut buffer = audio_data.audio_buffer.lock().unwrap();
+            buffer.extend(samples);
+        }
     }
 
     /// Process SDL events and return joypad state.
