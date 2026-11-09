@@ -65,6 +65,11 @@ pub(crate) struct Ppu {
 }
 
 impl Ppu {
+    /// Current scanline (LY register).
+    pub fn ly(&self) -> u8 {
+        self.ly
+    }
+
     /// Deterministic LCD-off state; not a DMG/CGB power-on snapshot.
     pub(crate) fn new(cgb_mode: bool) -> Self {
         Self {

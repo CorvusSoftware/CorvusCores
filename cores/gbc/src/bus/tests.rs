@@ -87,8 +87,12 @@ fn original_game_boy_titles_use_compatibility_banking() {
 #[test]
 fn unsupported_registers_are_not_silently_fake_mapped() {
     let mut bus = test_bus(0x80);
-    for addr in [0xFEA0, 0xFF00, 0xFF01] {
+    // FF00 is now joypad, so exclude it from unmapped addresses
+    for addr in [0xFEA0, 0xFF01] {
         assert_eq!(bus.read(addr), None);
         assert!(!bus.write(addr, 0xAA));
     }
+    // FF00 is joypad - should be readable and writable
+    assert_eq!(bus.read(0xFF00), Some(0xFF));
+    assert!(bus.write(0xFF00, 0xAA));
 }

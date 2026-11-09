@@ -30,6 +30,7 @@ impl Bus {
                     Some(0xFF)
                 }
             }
+            0xFF00 => Some(self.joypad.read()),
             0xFF04..=0xFF07 => self.timer.read(address),
             0xFF0F => Some(self.interrupts.read_if()),
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read(address),
@@ -64,6 +65,10 @@ impl Bus {
                 } else {
                     true // CPU write ignored while PPU or DMA owns OAM.
                 }
+            }
+            0xFF00 => {
+                self.joypad.write(value);
+                true
             }
             0xFF04..=0xFF07 => self.timer.write(address, value),
             0xFF0F => {

@@ -128,12 +128,12 @@ fn hl_memory_variants_use_the_bus_and_distinct_bit_timing() {
 #[test]
 fn unavailable_hardware_is_an_explicit_cb_read_error() {
     let (mut cpu, mut bus) = fixture(&[0xCB, 0x46]); // BIT 0,(HL)
-    cpu.registers.set_hl(0xFF00); // Joypad not modeled yet
+    cpu.registers.set_hl(0xFF01); // Use FF01 which is still unmapped
     cpu.registers.set_flags(FLAG_CARRY);
 
     assert_eq!(
         cpu.step(&mut bus),
-        Err(CpuError::UnmappedRead { address: 0xFF00 })
+        Err(CpuError::UnmappedRead { address: 0xFF01 })
     );
     assert_eq!(cpu.registers.pc, 2);
     assert_eq!(cpu.registers.flags(), FLAG_CARRY);

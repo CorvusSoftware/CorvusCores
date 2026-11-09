@@ -11,6 +11,7 @@
 use crate::cartridge::{Cartridge, CgbSupport};
 use crate::dma::{OamDma, VramDma};
 use crate::interrupts::{Interrupt, InterruptController};
+use crate::joypad::Joypad;
 use crate::memory::{HighRam, WorkRam};
 use crate::timer::Timer;
 use crate::video::{ObjectRam, Ppu, VideoRam};
@@ -51,6 +52,7 @@ pub struct Bus {
     ppu: Ppu,
     timer: Timer,
     interrupts: InterruptController,
+    pub joypad: Joypad,
 }
 
 impl Bus {
@@ -73,6 +75,7 @@ impl Bus {
             ppu: Ppu::new(color),
             timer: Timer::new(),
             interrupts: InterruptController::new(),
+            joypad: Joypad::new(),
         }
     }
 
@@ -80,10 +83,15 @@ impl Bus {
         self.mode
     }
 
-    /// Completed scanline pixels, row-major RGB555, 160 × 144.
+    /// Completed scanline pixels, row-major RGB555, 160 x 144.
     /// Read-only; no framebuffer front/back swap or frontend API exists yet.
     pub fn framebuffer(&self) -> &[u16] {
         self.ppu.framebuffer()
+    }
+
+    /// Current scanline (LY register).
+    pub fn ly(&self) -> u8 {
+        self.ppu.ly()
     }
 
     pub fn request_interrupt(&mut self, interrupt: Interrupt) {

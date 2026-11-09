@@ -11,3 +11,4 @@ description = "Game Boy Color emulation core foundations for CorvusCores"
 publish = false
 
 [dependencies]
+sdl2 = { version = "0.35", features = ["bundled", "static-link"] }

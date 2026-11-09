@@ -276,11 +276,11 @@ fn signed_stack_pointer_addition_and_hl_transfer_use_byte_carries() {
 fn alu_memory_operand_reports_unimplemented_registers_without_mutation() {
     let (mut cpu, mut bus) = fixture(&[0xA6]); // AND (HL)
     cpu.registers.a = 0xFA;
-    cpu.registers.set_hl(0xFF00);
+    cpu.registers.set_hl(0xFF01); // Use FF01 which is still unmapped
     cpu.registers.set_flags(FLAG_CARRY);
     assert_eq!(
         cpu.step(&mut bus),
-        Err(CpuError::UnmappedRead { address: 0xFF00 })
+        Err(CpuError::UnmappedRead { address: 0xFF01 })
     );
     assert_eq!(cpu.registers.a, 0xFA);
     assert_eq!(cpu.registers.flags(), FLAG_CARRY);

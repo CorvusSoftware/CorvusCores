@@ -145,26 +145,26 @@ fn ldh_can_address_currently_supported_cgb_video_bank_register() {
 
 #[test]
 fn unsupported_io_transfers_report_errors_and_keep_registers_intact() {
-    let cases: &[(u8, &[u8], bool)] = &[
-        (0xE0, &[0x00], true),
-        (0xF0, &[0x00], false),
-        (0xE2, &[], true),
-        (0xF2, &[], false),
-        (0xEA, &[0x00, 0xFF], true),
-        (0xFA, &[0x00, 0xFF], false),
+    let cases: &[(u8, &[u8], bool, u16)] = &[
+        (0xE0, &[0x01], true, 0xFF01), // LDH (a8),A with offset 0x01
+        (0xF0, &[0x01], false, 0xFF01), // LDH A,(a8) with offset 0x01
+        (0xE2, &[], true, 0xFF01),     // LD (C),A with C=1
+        (0xF2, &[], false, 0xFF01),    // LD A,(C) with C=1
+        (0xEA, &[0x01, 0xFF], true, 0xFF01), // LD (a16),A with FF01
+        (0xFA, &[0x01, 0xFF], false, 0xFF01), // LD A,(a16) with FF01
     ];
-    for &(opcode, immediate, is_write) in cases {
+    for &(opcode, immediate, is_write, expected_addr) in cases {
         let mut code = vec![opcode];
         code.extend_from_slice(immediate);
         let (mut cpu, mut bus) = fixture(&code);
-        cpu.registers.c = 0;
+        cpu.registers.c = 1; // For E2/F2: address = FF00 | C = FF01
         cpu.registers.a = 0xA5;
         cpu.registers.set_flags(FLAG_HALF_CARRY | FLAG_CARRY);
 
         let expected = if is_write {
-            CpuError::UnmappedWrite { address: 0xFF00 }
+            CpuError::UnmappedWrite { address: expected_addr }
         } else {
-            CpuError::UnmappedRead { address: 0xFF00 }
+            CpuError::UnmappedRead { address: expected_addr }
         };
         assert_eq!(cpu.step(&mut bus), Err(expected), "opcode {opcode:02X}");
         assert_eq!(cpu.registers.a, 0xA5);

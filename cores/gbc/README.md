@@ -1,6 +1,8 @@
 # Game Boy Color core
 
-This directory contains the independently developed **Game Boy Color core** for CorvusCores, including a path for original Game Boy compatibility. It is **not yet a runnable emulator**.
+This directory contains the independently developed **Game Boy Color core** for CorvusCores, including a path for original Game Boy compatibility. 
+
+**A basic SDL2 frontend is now available** via the `corvus_gbc` binary, allowing you to run ROMs and see the display.
 
 ## Component layout
 
@@ -136,6 +138,33 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test -p corvus-gbc
 ```
+
+## Running the Emulator
+
+To run a ROM with the SDL2 frontend:
+
+```sh
+cargo run --bin corvus_gbc -- <path_to_rom.gb> [--cgb|--dmg]
+```
+
+Options:
+- `--cgb`: Force CGB mode
+- `--dmg`: Force DMG mode (default: auto-detect from cartridge header)
+
+Controls:
+- Arrow keys: Direction pad
+- A: A button
+- S: B button
+- Z: Select button
+- Enter: Start button
+- ESC: Quit
+
+## New Features Added
+
+- **SDL2 Frontend**: Window display with 4x scaling, rendering the PPU framebuffer
+- **Boot ROM Emulation**: DMG and CGB boot sequences with proper register initialization
+- **Joypad Support**: Full joypad input handling via FF00 register
+- **Binary Entry Point**: `corvus_gbc` binary for easy testing
 
 ## Hardware references
 

@@ -160,11 +160,11 @@ fn absolute_memory_load_and_store_use_little_endian_addresses() {
 
 #[test]
 fn returns_explicit_error_instead_of_faking_unimplemented_hardware() {
-    let (mut cpu, mut bus) = fixture(&[0x21, 0x00, 0xFF, 0x7E]);
+    let (mut cpu, mut bus) = fixture(&[0x21, 0x01, 0xFF, 0x7E]);
     assert_eq!(cpu.step(&mut bus), Ok(12));
     assert_eq!(
         cpu.step(&mut bus),
-        Err(CpuError::UnmappedRead { address: 0xFF00 })
+        Err(CpuError::UnmappedRead { address: 0xFF01 })
     );
 }
 

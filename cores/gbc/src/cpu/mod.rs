@@ -41,10 +41,10 @@ pub use registers::{Registers, FLAG_CARRY, FLAG_HALF_CARRY, FLAG_SUBTRACT, FLAG_
 #[derive(Clone, Debug, Default)]
 pub struct Cpu {
     pub registers: Registers,
-    ime: bool,
-    ime_enable_pending: bool,
-    halted: bool,
-    halt_bug: bool,
+    pub ime: bool,
+    pub ime_enable_pending: bool,
+    pub halted: bool,
+    pub halt_bug: bool,
 }
 
 impl Cpu {

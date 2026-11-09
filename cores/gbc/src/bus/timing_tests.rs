@@ -114,8 +114,12 @@ fn request_priority_is_observable_without_premature_cpu_dispatch() {
 #[test]
 fn unsupported_io_registers_remain_unimplemented() {
     let mut bus = fixture(&[]);
-    for address in [0xFF00, 0xFF01, 0xFF02, 0xFF50] {
+    // FF00 is now joypad, so exclude it
+    for address in [0xFF01, 0xFF02, 0xFF50] {
         assert_eq!(bus.read(address), None);
         assert!(!bus.write(address, 0xFF));
     }
+    // FF00 is joypad - should be readable and writable
+    assert_eq!(bus.read(0xFF00), Some(0xFF));
+    assert!(bus.write(0xFF00, 0xAA));
 }
